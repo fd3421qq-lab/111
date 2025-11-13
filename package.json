@@ -8,10 +8,12 @@
     "build": "tsc",
     "demo": "tsc && node dist/demo.js",
     "demo:visual": "tsc && node dist/visualDemo.js",
+    "demo:battle": "tsc && node dist/battleDemo.js",
     "test:eventbar": "tsc && node dist/eventBarTest.js",
+    "test:battle": "tsc && node dist/battleIntegrationTest.js",
     "watch": "tsc --watch",
     "clean": "rm -rf dist",
-    "test": "npm run test:eventbar"
+    "test": "npm run demo:battle"
   },
   "keywords": [
     "game",
