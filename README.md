@@ -1,43 +1,45 @@
-# 三消对战游戏 - 事件系统核心框架
+# 三消对战游戏 - 完整系统
 
-一个使用 TypeScript 编写的三消对战游戏事件系统核心框架，提供灵活的事件管理和游戏状态控制功能。
+一个使用 TypeScript 编写的硬核竞技三消对战游戏系统，包含事件系统、三消玩法和对战管理的完整实现。
 
 ## 项目概览
 
 - **项目名称**: match3-event-system
 - **技术栈**: TypeScript + Node.js
-- **目标**: 为三消对战游戏提供完整的事件触发、管理和状态控制系统
-- **版本**: 1.0.0
+- **目标**: 提供完整的三消对战游戏核心逻辑和事件系统
+- **版本**: 1.1.0 (第一阶段集成完成)
+- **特点**: 纯技术竞技、全局策略棋盘事件、实时PVP对战
 
 ## 核心功能
 
-### ✅ 已完成功能
+### ✅ 第一阶段：完整系统集成（已完成）
 
-1. **事件类型定义** (`GameEventType`)
+#### 1. **事件系统核心** 
    - ⬆️ `GRAVITY_REVERSE` - 重力反转
    - ❄️ `FROZEN_COLORS` - 冻结颜色
    - ⚡ `COMBO_BONUS` - 连击加成
    - 🚧 `OBSTACLE_GENERATE` - 生成障碍物
    - 🚀 `SPEED_UP` - 加速
 
-2. **事件条类** (`EventBar`)
-   - 进度管理：追踪当前进度和最大进度值
-   - 事件序列：支持自定义或随机生成事件序列
-   - 进度推进：根据分数推进进度，自动触发事件
-   - 查询功能：获取下一个事件、进度百分比、剩余事件数等
-   - 重置功能：重置进度条和事件序列
+#### 2. **三消网格系统** (`GridSystem`)
+   - 8x8 网格，5种糖果类型
+   - 交换验证和匹配检测
+   - 重力掉落和连锁反应
+   - 事件效果接口（重力反转、颜色冻结、障碍物生成）
+   - 完整的游戏逻辑实现
 
-3. **游戏管理器** (`GameManager`)
-   - 游戏状态管理：IDLE、PLAYING、PAUSED、GAME_OVER
-   - 分数系统：追踪玩家分数并与事件系统联动
-   - 事件处理：统一处理各类事件触发逻辑
-   - 活动事件追踪：记录当前生效的事件及持续时间
-   - 事件回调：支持注册自定义事件监听器
+#### 3. **对战管理系统** (`BattleManager`)
+   - 集成 GameManager 事件系统
+   - 双人格局（玩家 + 对手）
+   - 回合制对战流程
+   - 分数计算与事件推进自动联动
+   - 事件效果自动应用到双方网格
+   - 对战胜负判定
 
-4. **完整的 TypeScript 类型支持**
-   - 类型安全的事件系统
-   - 详细的接口和枚举定义
-   - 完整的类型注解和文档注释
+#### 4. **完整的类型系统**
+   - 事件、网格、对战全面类型定义
+   - 类型安全的接口设计
+   - 详细的文档注释
 
 ## 数据架构
 
@@ -101,10 +103,55 @@ npm run build
 ### 运行演示
 
 ```bash
+# 对战系统演示（推荐）⭐
+npm run demo:battle
+
+# 事件系统可视化演示
+npm run demo:visual
+
+# 基础事件系统演示
 npm run demo
+
+# 运行测试
+npm test
 ```
 
 ### 基本使用示例
+
+#### 1. 完整对战系统（推荐）
+
+```typescript
+import { BattleManager, PlayerType } from './src';
+
+// 创建对战管理器
+const battle = new BattleManager({
+  maxMoves: 20,
+  targetScore: 800,
+  eventProgressMax: 80
+});
+
+// 开始对战
+battle.startBattle();
+
+// 玩家回合
+const result = battle.playerTurn(
+  { row: 3, col: 2 },
+  { row: 3, col: 3 }
+);
+
+// 检查结果
+if (result.success) {
+  console.log(`获得 ${result.swapResult.score} 分`);
+  if (result.eventTriggered) {
+    console.log(`触发事件: ${result.eventTriggered}`);
+  }
+}
+
+// 查看对战状态
+console.log(battle.getBattleSummary());
+```
+
+#### 2. 仅使用事件系统
 
 ```typescript
 import { GameManager, GameEventType } from './src';
