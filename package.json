@@ -7,9 +7,11 @@
   "scripts": {
     "build": "tsc",
     "demo": "tsc && node dist/demo.js",
+    "demo:visual": "tsc && node dist/visualDemo.js",
+    "test:eventbar": "tsc && node dist/eventBarTest.js",
     "watch": "tsc --watch",
     "clean": "rm -rf dist",
-    "test": "npm run build && npm run demo"
+    "test": "npm run test:eventbar"
   },
   "keywords": [
     "game",
