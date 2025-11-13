@@ -1,0 +1,627 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>完整网络对战客户端 - Task 2.4</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            padding: 20px;
+        }
+
+        .container {
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 20px;
+            padding: 30px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            max-width: 1400px;
+            width: 100%;
+            margin: 0 auto;
+        }
+
+        h1 {
+            text-align: center;
+            color: #333;
+            margin-bottom: 10px;
+            font-size: 32px;
+        }
+
+        .subtitle {
+            text-align: center;
+            color: #666;
+            margin-bottom: 20px;
+            font-size: 14px;
+        }
+
+        .status-bar {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+
+        .status-card {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            padding: 15px;
+            border-radius: 10px;
+            color: white;
+        }
+
+        .status-card h3 {
+            font-size: 12px;
+            opacity: 0.9;
+            margin-bottom: 5px;
+        }
+
+        .status-card p {
+            font-size: 18px;
+            font-weight: 600;
+        }
+
+        .controls {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+
+        button {
+            padding: 10px 20px;
+            font-size: 14px;
+            font-weight: 600;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            color: white;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+        }
+
+        button:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 16px rgba(0, 0, 0, 0.2);
+        }
+
+        button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .btn-primary { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); }
+        .btn-success { background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%); }
+        .btn-info { background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%); }
+        .btn-warning { background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%); }
+        .btn-danger { background: linear-gradient(135deg, #ff6b6b 0%, #ee5a6f 100%); }
+
+        .main-grid {
+            display: grid;
+            grid-template-columns: 1fr 2fr 1fr;
+            gap: 20px;
+            margin-bottom: 20px;
+        }
+
+        .side-panel {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 10px;
+        }
+
+        .side-panel h3 {
+            font-size: 16px;
+            margin-bottom: 15px;
+            color: #333;
+        }
+
+        .canvas-container {
+            background: #1a1a2e;
+            padding: 20px;
+            border-radius: 12px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        canvas {
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+            max-width: 100%;
+            height: auto;
+        }
+
+        .info-item {
+            padding: 10px;
+            background: white;
+            border-radius: 8px;
+            margin-bottom: 10px;
+        }
+
+        .info-item label {
+            display: block;
+            font-size: 12px;
+            color: #666;
+            margin-bottom: 5px;
+        }
+
+        .info-item .value {
+            font-size: 16px;
+            font-weight: 600;
+            color: #333;
+        }
+
+        .log-container {
+            background: white;
+            padding: 10px;
+            border-radius: 8px;
+            max-height: 300px;
+            overflow-y: auto;
+            font-size: 12px;
+        }
+
+        .log-entry {
+            padding: 5px;
+            margin: 2px 0;
+            border-left: 3px solid #667eea;
+            padding-left: 8px;
+        }
+
+        .log-entry.success { border-left-color: #43e97b; }
+        .log-entry.error { border-left-color: #ff6b6b; }
+        .log-entry.warning { border-left-color: #f093fb; }
+
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.5);
+            z-index: 1000;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .modal.active {
+            display: flex;
+        }
+
+        .modal-content {
+            background: white;
+            padding: 30px;
+            border-radius: 15px;
+            max-width: 400px;
+            width: 90%;
+        }
+
+        .modal-content h2 {
+            margin-bottom: 20px;
+            color: #333;
+        }
+
+        .modal-content input {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #667eea;
+            border-radius: 8px;
+            font-size: 16px;
+            margin-bottom: 15px;
+        }
+
+        .modal-actions {
+            display: flex;
+            gap: 10px;
+            justify-content: flex-end;
+        }
+
+        .connection-indicator {
+            display: inline-block;
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background: #ff6b6b;
+            margin-right: 8px;
+        }
+
+        .connection-indicator.connected {
+            background: #43e97b;
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🎮 完整网络对战客户端</h1>
+        <p class="subtitle">Task 2.4 - 集成网络对战系统与BattleManager</p>
+
+        <!-- Status Bar -->
+        <div class="status-bar">
+            <div class="status-card">
+                <h3>连接状态</h3>
+                <p>
+                    <span class="connection-indicator" id="connIndicator"></span>
+                    <span id="connStatus">未连接</span>
+                </p>
+            </div>
+            <div class="status-card">
+                <h3>对战状态</h3>
+                <p id="battleStatus">等待中...</p>
+            </div>
+            <div class="status-card">
+                <h3>延迟</h3>
+                <p><span id="latency">--</span>ms</p>
+            </div>
+            <div class="status-card">
+                <h3>房间ID</h3>
+                <p id="roomId">--</p>
+            </div>
+        </div>
+
+        <!-- Controls -->
+        <div class="controls">
+            <button id="btnConnect" class="btn-success">连接服务器</button>
+            <button id="btnCreate" class="btn-primary" disabled>创建房间</button>
+            <button id="btnJoin" class="btn-info" disabled>加入房间</button>
+            <button id="btnMatch" class="btn-warning" disabled>随机匹配</button>
+            <button id="btnLeave" class="btn-danger" disabled>离开房间</button>
+        </div>
+
+        <!-- Main Grid -->
+        <div class="main-grid">
+            <!-- Left Panel -->
+            <div class="side-panel">
+                <h3>玩家信息</h3>
+                <div class="info-item">
+                    <label>玩家ID</label>
+                    <div class="value" id="playerId">--</div>
+                </div>
+                <div class="info-item">
+                    <label>角色</label>
+                    <div class="value" id="playerRole">--</div>
+                </div>
+                <div class="info-item">
+                    <label>分数</label>
+                    <div class="value" id="playerScore">0</div>
+                </div>
+                <div class="info-item">
+                    <label>移动次数</label>
+                    <div class="value" id="playerMoves">0</div>
+                </div>
+            </div>
+
+            <!-- Center - Canvas -->
+            <div class="canvas-container">
+                <canvas id="gameCanvas" width="800" height="600"></canvas>
+            </div>
+
+            <!-- Right Panel -->
+            <div class="side-panel">
+                <h3>对手信息</h3>
+                <div class="info-item">
+                    <label>对手ID</label>
+                    <div class="value" id="opponentId">--</div>
+                </div>
+                <div class="info-item">
+                    <label>状态</label>
+                    <div class="value" id="opponentStatus">等待中</div>
+                </div>
+                <div class="info-item">
+                    <label>分数</label>
+                    <div class="value" id="opponentScore">0</div>
+                </div>
+                <div class="info-item">
+                    <label>移动次数</label>
+                    <div class="value" id="opponentMoves">0</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Log Container -->
+        <div class="side-panel">
+            <h3>事件日志</h3>
+            <div class="log-container" id="logContainer"></div>
+        </div>
+    </div>
+
+    <!-- Join Room Modal -->
+    <div class="modal" id="joinModal">
+        <div class="modal-content">
+            <h2>加入房间</h2>
+            <input type="text" id="roomIdInput" placeholder="输入房间ID">
+            <div class="modal-actions">
+                <button class="btn-info" id="btnConfirmJoin">加入</button>
+                <button class="btn-danger" id="btnCancelJoin">取消</button>
+            </div>
+        </div>
+    </div>
+
+    <script type="module">
+        import { NetworkBattleManager, NetworkBattleState, NetworkPlayerRole } from '../dist/NetworkBattleManager.js';
+        import { GameUI } from '../dist/GameUI.js';
+        import { MatchmakingMode } from '../dist/MatchmakingSystem.js';
+
+        // WebSocket URL (auto-detect environment)
+        const WS_URL = window.location.hostname === 'localhost'
+            ? 'ws://localhost:8080'
+            : 'wss://8080-iktgs51wmt9svcuxtee4x-b32ec7bb.sandbox.novita.ai';
+
+        let networkBattle = null;
+        let gameUI = null;
+
+        // UI Elements
+        const connIndicator = document.getElementById('connIndicator');
+        const connStatus = document.getElementById('connStatus');
+        const battleStatus = document.getElementById('battleStatus');
+        const latency = document.getElementById('latency');
+        const roomId = document.getElementById('roomId');
+        const playerId = document.getElementById('playerId');
+        const playerRole = document.getElementById('playerRole');
+        const playerScore = document.getElementById('playerScore');
+        const playerMoves = document.getElementById('playerMoves');
+        const opponentId = document.getElementById('opponentId');
+        const opponentStatus = document.getElementById('opponentStatus');
+        const opponentScore = document.getElementById('opponentScore');
+        const opponentMoves = document.getElementById('opponentMoves');
+        const logContainer = document.getElementById('logContainer');
+
+        const btnConnect = document.getElementById('btnConnect');
+        const btnCreate = document.getElementById('btnCreate');
+        const btnJoin = document.getElementById('btnJoin');
+        const btnMatch = document.getElementById('btnMatch');
+        const btnLeave = document.getElementById('btnLeave');
+
+        const joinModal = document.getElementById('joinModal');
+
+        // Initialize
+        function init() {
+            addLog('系统初始化完成', 'success');
+            setupEventListeners();
+        }
+
+        // Setup event listeners
+        function setupEventListeners() {
+            btnConnect.addEventListener('click', handleConnect);
+            btnCreate.addEventListener('click', handleCreateRoom);
+            btnJoin.addEventListener('click', () => joinModal.classList.add('active'));
+            btnMatch.addEventListener('click', handleRandomMatch);
+            btnLeave.addEventListener('click', handleLeave);
+
+            document.getElementById('btnConfirmJoin').addEventListener('click', handleConfirmJoin);
+            document.getElementById('btnCancelJoin').addEventListener('click', () => joinModal.classList.remove('active'));
+        }
+
+        // Connect to server
+        async function handleConnect() {
+            try {
+                btnConnect.disabled = true;
+                btnConnect.textContent = '连接中...';
+
+                networkBattle = new NetworkBattleManager({ serverUrl: WS_URL });
+                
+                // Setup callbacks
+                networkBattle.onStateChange(handleStateChange);
+                networkBattle.onOpponentMove(handleOpponentMove);
+                networkBattle.onBattleStart(handleBattleStart);
+                networkBattle.onBattleEnd(handleBattleEnd);
+                networkBattle.onError(handleError);
+
+                await networkBattle.connect();
+                
+                playerId.textContent = networkBattle.getNetworkManager().getPlayerId();
+                addLog('已连接到服务器', 'success');
+                
+                btnCreate.disabled = false;
+                btnJoin.disabled = false;
+                btnMatch.disabled = false;
+
+                startLatencyMonitor();
+            } catch (error) {
+                addLog(`连接失败: ${error.message}`, 'error');
+                btnConnect.disabled = false;
+                btnConnect.textContent = '连接服务器';
+            }
+        }
+
+        // Create room
+        async function handleCreateRoom() {
+            try {
+                btnCreate.disabled = true;
+                const id = await networkBattle.createRoom();
+                roomId.textContent = id;
+                addLog(`房间已创建: ${id}`, 'success');
+                btnLeave.disabled = false;
+            } catch (error) {
+                addLog(`创建房间失败: ${error.message}`, 'error');
+                btnCreate.disabled = false;
+            }
+        }
+
+        // Join room
+        async function handleConfirmJoin() {
+            const id = document.getElementById('roomIdInput').value.trim();
+            if (!id) return;
+
+            try {
+                await networkBattle.joinRoom(id);
+                roomId.textContent = id;
+                joinModal.classList.remove('active');
+                addLog(`已加入房间: ${id}`, 'success');
+                btnLeave.disabled = false;
+            } catch (error) {
+                addLog(`加入房间失败: ${error.message}`, 'error');
+            }
+        }
+
+        // Random match
+        async function handleRandomMatch() {
+            try {
+                btnMatch.disabled = true;
+                battleStatus.textContent = '匹配中...';
+                addLog('开始随机匹配...', 'warning');
+                
+                await networkBattle.findMatch(MatchmakingMode.RANDOM);
+                roomId.textContent = networkBattle.getRoomId();
+                addLog('匹配成功!', 'success');
+                btnLeave.disabled = false;
+            } catch (error) {
+                addLog(`匹配失败: ${error.message}`, 'error');
+                btnMatch.disabled = false;
+                battleStatus.textContent = '等待中...';
+            }
+        }
+
+        // Leave room
+        function handleLeave() {
+            networkBattle.leaveRoom();
+            roomId.textContent = '--';
+            opponentId.textContent = '--';
+            playerRole.textContent = '--';
+            btnLeave.disabled = true;
+            btnCreate.disabled = false;
+            btnMatch.disabled = false;
+            addLog('已离开房间', 'warning');
+        }
+
+        // State change handler
+        function handleStateChange(state) {
+            battleStatus.textContent = getStateText(state);
+            
+            if (state === NetworkBattleState.CONNECTED) {
+                connIndicator.classList.add('connected');
+                connStatus.textContent = '已连接';
+            } else if (state === NetworkBattleState.DISCONNECTED) {
+                connIndicator.classList.remove('connected');
+                connStatus.textContent = '未连接';
+            }
+            
+            if (state === NetworkBattleState.IN_BATTLE) {
+                initGameUI();
+            }
+        }
+
+        // Opponent move handler
+        function handleOpponentMove(move) {
+            addLog(`对手移动: (${move.pos1.row},${move.pos1.col}) ↔ (${move.pos2.row},${move.pos2.col})`, 'warning');
+            updateGameState();
+        }
+
+        // Battle start handler
+        function handleBattleStart() {
+            addLog('对战开始!', 'success');
+            opponentId.textContent = networkBattle.getOpponentId() || 'Unknown';
+            playerRole.textContent = getRoleText(networkBattle.getPlayerRole());
+            opponentStatus.textContent = '已就绪';
+        }
+
+        // Battle end handler
+        function handleBattleEnd(winner) {
+            addLog(`对战结束! 胜者: ${winner}`, 'success');
+        }
+
+        // Error handler
+        function handleError(error) {
+            addLog(`错误: ${error.message}`, 'error');
+        }
+
+        // Initialize game UI
+        function initGameUI() {
+            if (!gameUI) {
+                gameUI = new GameUI({
+                    canvasId: 'gameCanvas',
+                    width: 800,
+                    height: 600,
+                    cellSize: 40
+                });
+                
+                const battleManager = networkBattle.getBattleManager();
+                gameUI.bindBattleManager(battleManager);
+                
+                addLog('游戏UI已初始化', 'success');
+            }
+            
+            updateGameState();
+        }
+
+        // Update game state
+        function updateGameState() {
+            if (!networkBattle || !networkBattle.isInBattle()) return;
+            
+            const battleManager = networkBattle.getBattleManager();
+            const playerData = battleManager.getPlayerData();
+            const opponentData = battleManager.getOpponentData();
+            
+            playerScore.textContent = playerData.score;
+            playerMoves.textContent = playerData.moves;
+            opponentScore.textContent = opponentData.score;
+            opponentMoves.textContent = opponentData.moves;
+            
+            if (gameUI) {
+                gameUI.updateStateFromBattle(battleManager);
+            }
+        }
+
+        // Start latency monitor
+        function startLatencyMonitor() {
+            setInterval(() => {
+                if (networkBattle && networkBattle.isConnected()) {
+                    latency.textContent = networkBattle.getLatency();
+                }
+            }, 1000);
+        }
+
+        // Helper functions
+        function getStateText(state) {
+            const texts = {
+                DISCONNECTED: '未连接',
+                CONNECTING: '连接中',
+                CONNECTED: '已连接',
+                IN_LOBBY: '大厅中',
+                IN_ROOM: '房间中',
+                IN_BATTLE: '对战中',
+                RECONNECTING: '重连中',
+                ERROR: '错误'
+            };
+            return texts[state] || state;
+        }
+
+        function getRoleText(role) {
+            const texts = {
+                HOST: '房主',
+                GUEST: '客人',
+                UNKNOWN: '未知'
+            };
+            return texts[role] || role;
+        }
+
+        function addLog(message, type = 'info') {
+            const entry = document.createElement('div');
+            entry.className = `log-entry ${type}`;
+            entry.textContent = `[${new Date().toLocaleTimeString()}] ${message}`;
+            logContainer.insertBefore(entry, logContainer.firstChild);
+            
+            if (logContainer.children.length > 50) {
+                logContainer.removeChild(logContainer.lastChild);
+            }
+        }
+
+        // Initialize on load
+        init();
+    </script>
+</body>
+</html>
