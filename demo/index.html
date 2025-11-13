@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>消消乐游戏演示 - 索引页</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        .container {
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 20px;
+            padding: 50px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            max-width: 800px;
+            width: 100%;
+        }
+
+        h1 {
+            text-align: center;
+            color: #333;
+            margin-bottom: 15px;
+            font-size: 42px;
+            font-weight: 700;
+        }
+
+        .subtitle {
+            text-align: center;
+            color: #666;
+            margin-bottom: 40px;
+            font-size: 18px;
+        }
+
+        .demo-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 25px;
+            margin-bottom: 30px;
+        }
+
+        .demo-card {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            padding: 30px;
+            border-radius: 15px;
+            color: white;
+            text-decoration: none;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+        }
+
+        .demo-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 8px 20px rgba(0, 0, 0, 0.25);
+        }
+
+        .demo-card h2 {
+            font-size: 24px;
+            margin-bottom: 10px;
+        }
+
+        .demo-card p {
+            font-size: 14px;
+            opacity: 0.9;
+            line-height: 1.6;
+        }
+
+        .demo-card .status {
+            display: inline-block;
+            padding: 4px 12px;
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 12px;
+            font-size: 12px;
+            margin-top: 15px;
+        }
+
+        .status.ready {
+            background: rgba(38, 222, 129, 0.3);
+        }
+
+        .info-section {
+            background: #f8f9fa;
+            padding: 25px;
+            border-radius: 12px;
+            margin-top: 30px;
+        }
+
+        .info-section h3 {
+            color: #333;
+            margin-bottom: 15px;
+            font-size: 20px;
+        }
+
+        .info-section ul {
+            list-style: none;
+            color: #666;
+        }
+
+        .info-section li {
+            padding: 8px 0;
+            border-bottom: 1px solid #e0e0e0;
+        }
+
+        .info-section li:last-child {
+            border-bottom: none;
+        }
+
+        .info-section li:before {
+            content: "✓ ";
+            color: #43e97b;
+            font-weight: bold;
+            margin-right: 8px;
+        }
+
+        .server-status {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: white;
+            padding: 15px 20px;
+            border-radius: 10px;
+            margin-bottom: 15px;
+        }
+
+        .server-status .dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background: #43e97b;
+            margin-right: 10px;
+            display: inline-block;
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🍬 消消乐游戏演示</h1>
+        <p class="subtitle">Match-3 AI Battle System - 完整功能展示</p>
+
+        <div class="demo-grid">
+            <a href="/demo/webBattleDemo.html" class="demo-card">
+                <h2>🤖 AI对战演示</h2>
+                <p>体验与AI对手的实时对战，查看AI策略分析和智能决策过程。支持三种AI难度：激进、平衡、保守。</p>
+                <span class="status ready">Task 2.2 ✓</span>
+            </a>
+
+            <a href="/demo/networkBattleDemo.html" class="demo-card">
+                <h2>🌐 网络对战演示</h2>
+                <p>支持在线PVP对战，包括创建房间、随机匹配、好友邀请等功能。实时同步，断线重连。</p>
+                <span class="status ready">Task 2.3 ✓</span>
+            </a>
+        </div>
+
+        <div class="info-section">
+            <h3>📊 服务器状态</h3>
+            <div class="server-status">
+                <div>
+                    <span class="dot"></span>
+                    <strong>HTTP服务器</strong>
+                </div>
+                <span>端口 3000 - 运行中</span>
+            </div>
+            <div class="server-status">
+                <div>
+                    <span class="dot"></span>
+                    <strong>WebSocket服务器</strong>
+                </div>
+                <span>端口 8080 - 运行中</span>
+            </div>
+        </div>
+
+        <div class="info-section">
+            <h3>✨ 已完成功能</h3>
+            <ul>
+                <li>核心游戏引擎 - 8×8网格消除系统</li>
+                <li>事件系统 - 重力反转、颜色冻结、双倍分数</li>
+                <li>AI对手系统 - 三种策略（激进/平衡/保守）</li>
+                <li>可视化界面 - HTML5 Canvas 60fps渲染</li>
+                <li>动画系统 - 交换、消除、下落特效</li>
+                <li>网络对战 - WebSocket实时PVP</li>
+                <li>房间系统 - 创建/加入/匹配功能</li>
+                <li>断线重连 - 自动恢复游戏状态</li>
+            </ul>
+        </div>
+
+        <div class="info-section">
+            <h3>🔗 访问链接</h3>
+            <ul>
+                <li><strong>AI对战:</strong> <a href="/demo/webBattleDemo.html" style="color: #667eea;">/demo/webBattleDemo.html</a></li>
+                <li><strong>网络对战:</strong> <a href="/demo/networkBattleDemo.html" style="color: #667eea;">/demo/networkBattleDemo.html</a></li>
+                <li><strong>公共访问:</strong> https://3000-iktgs51wmt9svcuxtee4x-b32ec7bb.sandbox.novita.ai</li>
+            </ul>
+        </div>
+    </div>
+</body>
+</html>

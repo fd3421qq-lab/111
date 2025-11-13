@@ -424,7 +424,11 @@
         import { PlayerType } from '../dist/BattleManager.js';
 
         // WebSocket server URL
-        const WS_URL = 'ws://localhost:8080';
+        // For local development: ws://localhost:8080
+        // For sandbox: wss://8080-iktgs51wmt9svcuxtee4x-b32ec7bb.sandbox.novita.ai
+        const WS_URL = window.location.hostname === 'localhost' 
+            ? 'ws://localhost:8080' 
+            : 'wss://8080-iktgs51wmt9svcuxtee4x-b32ec7bb.sandbox.novita.ai';
 
         let networkManager = null;
         let matchmakingSystem = null;
