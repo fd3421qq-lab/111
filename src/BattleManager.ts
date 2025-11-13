@@ -7,6 +7,7 @@
 import { GameManager, GameState } from './GameManager.js';
 import { GameEventType } from './GameEventType.js';
 import { GridSystem, CandyType, Position, SwapResult } from './GridSystem.js';
+import { AIOpponent, AIMove as AIOpponentMove, AIStrategy } from './AIOpponent.js';
 
 /**
  * 玩家类型
@@ -53,8 +54,11 @@ export interface TurnResult {
 export interface AIMove {
   pos1: Position;
   pos2: Position;
-  expectedScore: number;
+  estimatedScore: number;
+  reason: string;
 }
+
+export { AIStrategy } from './AIOpponent.js';
 
 /**
  * 对战配置接口
@@ -85,6 +89,7 @@ export class BattleManager {
   private activeEventTimers: Map<GameEventType, NodeJS.Timeout>;
   private enableAI: boolean;
   private aiDifficulty: 'easy' | 'medium' | 'hard';
+  private aiOpponent: AIOpponent | null;
   
   // 事件进度推进倍率
   private readonly PLAYER_PROGRESS_MULTIPLIER = 1.2;   // 玩家推进 120%
@@ -129,6 +134,7 @@ export class BattleManager {
     this.currentTurn = PlayerType.PLAYER;
     this.battleActive = false;
     this.activeEventTimers = new Map();
+    this.aiOpponent = this.enableAI ? new AIOpponent(this.opponent.grid) : null;
 
     // 注册事件监听器
     this.registerEventListeners();
@@ -479,82 +485,25 @@ export class BattleManager {
    * @returns AI 回合结果，如果不是对手回合或 AI 未启用则返回 null
    */
   public executeAITurn(): TurnResult | null {
-    if (!this.enableAI || this.currentTurn !== PlayerType.OPPONENT) {
+    if (!this.enableAI || this.currentTurn !== PlayerType.OPPONENT || !this.aiOpponent) {
       return null;
     }
 
-    const aiMove = this.findAIMove();
+    const aiMove = this.aiOpponent.findBestMove();
     if (!aiMove) {
-      console.log('AI 未找到有效移动');
+      console.log('[AI] No valid move found');
       return {
         success: false,
         message: 'AI 未找到有效移动'
       };
     }
 
+    console.log('[AI] Strategy:', this.aiOpponent.getMoveStrategy());
+    console.log('[AI] Move: (' + aiMove.pos1.row + ',' + aiMove.pos1.col + ') to (' + aiMove.pos2.row + ',' + aiMove.pos2.col + ')');
+    console.log('[AI] Estimated Score:', aiMove.estimatedScore);
+    console.log('[AI] Reason:', aiMove.reason);
+
     return this.opponentTurn(aiMove.pos1, aiMove.pos2);
-  }
-
-  /**
-   * 查找 AI 移动（简化版本，快速查找第一个有效移动）
-   */
-  private findAIMove(): AIMove | null {
-    const gridSize = this.opponent.grid.getSize();
-    const possibleMoves: AIMove[] = [];
-
-    // 根据难度决定搜索范围
-    const searchLimit = this.aiDifficulty === 'easy' ? 10 : 
-                       this.aiDifficulty === 'medium' ? 30 : 50;
-    let searchCount = 0;
-
-    // 遍历网格查找可能的移动
-    for (let row = 0; row < gridSize.rows && searchCount < searchLimit; row++) {
-      for (let col = 0; col < gridSize.cols && searchCount < searchLimit; col++) {
-        const pos1: Position = { row, col };
-
-        // 检查右边
-        if (col < gridSize.cols - 1) {
-          const pos2: Position = { row, col: col + 1 };
-          possibleMoves.push({ pos1, pos2, expectedScore: 10 });
-          searchCount++;
-        }
-
-        // 检查下边
-        if (row < gridSize.rows - 1 && searchCount < searchLimit) {
-          const pos2: Position = { row: row + 1, col };
-          possibleMoves.push({ pos1, pos2, expectedScore: 10 });
-          searchCount++;
-        }
-      }
-    }
-
-    if (possibleMoves.length === 0) return null;
-
-    // 根据难度选择移动
-    return this.selectMoveByDifficulty(possibleMoves);
-  }
-
-  /**
-   * 根据难度选择移动
-   */
-  private selectMoveByDifficulty(moves: AIMove[]): AIMove {
-    switch (this.aiDifficulty) {
-      case 'easy':
-        // 简单：完全随机
-        return moves[Math.floor(Math.random() * moves.length)];
-
-      case 'medium':
-        // 中等：倾向选择前面的移动（可能更优）
-        const mediumIndex = Math.floor(Math.random() * Math.min(moves.length, moves.length / 2));
-        return moves[mediumIndex];
-
-      case 'hard':
-        // 困难：总是选择第一个找到的移动（遍历顺序优先）
-        return moves[0];
-
-      default:
-        return moves[0];
-    }
   }
 
   /**
@@ -562,6 +511,9 @@ export class BattleManager {
    */
   public setAIEnabled(enabled: boolean): void {
     this.enableAI = enabled;
+    if (enabled && !this.aiOpponent) {
+      this.aiOpponent = new AIOpponent(this.opponent.grid);
+    }
   }
 
   /**
@@ -583,6 +535,26 @@ export class BattleManager {
    */
   public getAIDifficulty(): 'easy' | 'medium' | 'hard' {
     return this.aiDifficulty;
+  }
+
+  public setAIStrategy(strategy: AIStrategy): void {
+    if (this.aiOpponent) {
+      this.aiOpponent.setStrategy(strategy);
+    }
+  }
+
+  public setAIStrategyChangeChance(chance: number): void {
+    if (this.aiOpponent) {
+      this.aiOpponent.setStrategyChangeChance(chance);
+    }
+  }
+
+  public getAIStrategy(): AIStrategy | null {
+    return this.aiOpponent ? this.aiOpponent.getCurrentStrategy() : null;
+  }
+
+  public getAIDebugInfo(): string {
+    return this.aiOpponent ? this.aiOpponent.getDebugInfo() : 'AI not enabled';
   }
 
   // ==================== 查询方法 ====================

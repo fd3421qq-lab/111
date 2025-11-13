@@ -12,4 +12,7 @@ export { GameManager, GameState } from './GameManager.js';
 export { GridSystem, CandyType, Position, MatchResult, SwapResult, GridState } from './GridSystem.js';
 
 // 对战管理系统
-export { BattleManager, PlayerType, PlayerData, BattleResult, TurnResult, BattleConfig, AIMove } from './BattleManager.js';
+export { BattleManager, PlayerType, PlayerData, BattleResult, TurnResult, BattleConfig, AIMove, AIStrategy } from './BattleManager.js';
+
+// AI 对手系统
+export { AIOpponent } from './AIOpponent.js';
