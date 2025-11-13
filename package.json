@@ -1,0 +1,26 @@
+{
+  "name": "match3-event-system",
+  "version": "1.0.0",
+  "description": "三消对战游戏事件系统核心框架",
+  "main": "dist/index.js",
+  "type": "module",
+  "scripts": {
+    "build": "tsc",
+    "demo": "tsc && node dist/demo.js",
+    "watch": "tsc --watch",
+    "clean": "rm -rf dist",
+    "test": "npm run build && npm run demo"
+  },
+  "keywords": [
+    "game",
+    "match3",
+    "event-system",
+    "typescript"
+  ],
+  "author": "",
+  "license": "MIT",
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "typescript": "^5.0.0"
+  }
+}
