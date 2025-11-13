@@ -9,6 +9,7 @@
     "demo": "tsc && node dist/demo.js",
     "demo:visual": "tsc && node dist/visualDemo.js",
     "demo:battle": "tsc && node dist/battleDemo.js",
+    "demo:ai": "tsc && node dist/aiDemo.js",
     "test:eventbar": "tsc && node dist/eventBarTest.js",
     "test:battle": "tsc && node dist/battleIntegrationTest.js",
     "watch": "tsc --watch",

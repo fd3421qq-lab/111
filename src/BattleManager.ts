@@ -48,6 +48,15 @@ export interface TurnResult {
 }
 
 /**
+ * AI 移动接口
+ */
+export interface AIMove {
+  pos1: Position;
+  pos2: Position;
+  expectedScore: number;
+}
+
+/**
  * 对战配置接口
  */
 export interface BattleConfig {
@@ -55,6 +64,8 @@ export interface BattleConfig {
   targetScore?: number;        // 目标分数（默认1000）
   eventProgressMax?: number;   // 事件进度最大值（默认100）
   gridSize?: { rows: number, cols: number };  // 网格尺寸
+  enableAI?: boolean;          // 是否启用 AI 对手（默认 false）
+  aiDifficulty?: 'easy' | 'medium' | 'hard';  // AI 难度（默认 medium）
 }
 
 /**
@@ -66,12 +77,18 @@ export class BattleManager {
   private player: PlayerData;
   private opponent: PlayerData;
   private currentTurn: PlayerType;
-  private config: Required<BattleConfig>;
+  private config: Required<Omit<BattleConfig, 'enableAI' | 'aiDifficulty'>>;
   private battleActive: boolean;
   
   // 事件效果持续时间（毫秒）
   private readonly EVENT_DURATION = 15000; // 15秒
   private activeEventTimers: Map<GameEventType, NodeJS.Timeout>;
+  private enableAI: boolean;
+  private aiDifficulty: 'easy' | 'medium' | 'hard';
+  
+  // 事件进度推进倍率
+  private readonly PLAYER_PROGRESS_MULTIPLIER = 1.2;   // 玩家推进 120%
+  private readonly OPPONENT_PROGRESS_MULTIPLIER = 0.8; // 对手推进 80%
 
   /**
    * 构造函数
@@ -85,6 +102,9 @@ export class BattleManager {
       eventProgressMax: config.eventProgressMax || 100,
       gridSize: config.gridSize || { rows: 8, cols: 8 }
     };
+    
+    this.enableAI = config.enableAI || false;
+    this.aiDifficulty = config.aiDifficulty || 'medium';
 
     // 初始化事件管理器
     this.gameManager = new GameManager(this.config.eventProgressMax);
@@ -194,21 +214,34 @@ export class BattleManager {
   }
 
   /**
-   * 设置事件定时器
+   * 设置事件定时器（增强错误处理）
    */
   private setEventTimer(event: GameEventType, callback: () => void): void {
     // 清除已有的定时器
     if (this.activeEventTimers.has(event)) {
-      clearTimeout(this.activeEventTimers.get(event)!);
+      try {
+        clearTimeout(this.activeEventTimers.get(event)!);
+      } catch (error) {
+        console.error(`清除事件定时器失败: ${event}`, error);
+      }
     }
     
-    // 设置新定时器
-    const timer = setTimeout(() => {
-      callback();
-      this.activeEventTimers.delete(event);
-    }, this.EVENT_DURATION);
-    
-    this.activeEventTimers.set(event, timer);
+    try {
+      // 设置新定时器
+      const timer = setTimeout(() => {
+        try {
+          callback();
+        } catch (error) {
+          console.error(`事件回调执行失败: ${event}`, error);
+        } finally {
+          this.activeEventTimers.delete(event);
+        }
+      }, this.EVENT_DURATION);
+      
+      this.activeEventTimers.set(event, timer);
+    } catch (error) {
+      console.error(`设置事件定时器失败: ${event}`, error);
+    }
   }
 
   /**
@@ -301,17 +334,24 @@ export class BattleManager {
     
     playerData.score += score;
 
-    // 推进事件系统（只有玩家的操作推进事件）
+    // 推进事件系统（双方都推进，但速度不同）
     let eventTriggered: GameEventType | undefined;
-    if (playerData.type === PlayerType.PLAYER) {
-      // 使用得分推进事件进度
-      this.gameManager.addScore(score);
+    try {
+      // 根据玩家类型应用不同的进度倍率
+      const progressMultiplier = playerData.type === PlayerType.PLAYER
+        ? this.PLAYER_PROGRESS_MULTIPLIER
+        : this.OPPONENT_PROGRESS_MULTIPLIER;
+      
+      const progressPoints = Math.floor(score * progressMultiplier);
+      this.gameManager.addScore(progressPoints);
       
       // 检查是否触发了新事件
       const activeEvents = this.gameManager.getActiveEvents();
       if (activeEvents.length > 0) {
         eventTriggered = activeEvents[activeEvents.length - 1];
       }
+    } catch (error) {
+      console.error('推进事件系统失败:', error);
     }
 
     console.log(`\n${playerData.type} 回合 #${playerData.moves}:`);
@@ -400,14 +440,26 @@ export class BattleManager {
   }
 
   /**
-   * 结束对战
+   * 结束对战（增强资源清理）
    */
   private endBattle(result: BattleResult): void {
     this.battleActive = false;
-    this.gameManager.endGame();
     
-    // 清除所有事件定时器
-    this.activeEventTimers.forEach(timer => clearTimeout(timer));
+    try {
+      this.gameManager.endGame();
+    } catch (error) {
+      console.error('游戏管理器结束失败:', error);
+    }
+    
+    // 清除所有事件定时器，确保资源完全释放
+    this.activeEventTimers.forEach((timer, event) => {
+      try {
+        clearTimeout(timer);
+        console.log(`清理事件定时器: ${event}`);
+      } catch (error) {
+        console.error(`清理事件定时器失败: ${event}`, error);
+      }
+    });
     this.activeEventTimers.clear();
 
     console.log('\n╔════════════════════════════════════════╗');
@@ -418,6 +470,119 @@ export class BattleManager {
     console.log(`\n最终比分:`);
     console.log(`  玩家: ${result.playerScore} 分 (${this.player.moves} 步)`);
     console.log(`  对手: ${result.opponentScore} 分 (${this.opponent.moves} 步)`);
+  }
+
+  // ==================== AI 对手功能 ====================
+
+  /**
+   * 执行 AI 回合（自动为对手选择移动）
+   * @returns AI 回合结果，如果不是对手回合或 AI 未启用则返回 null
+   */
+  public executeAITurn(): TurnResult | null {
+    if (!this.enableAI || this.currentTurn !== PlayerType.OPPONENT) {
+      return null;
+    }
+
+    const aiMove = this.findAIMove();
+    if (!aiMove) {
+      console.log('AI 未找到有效移动');
+      return {
+        success: false,
+        message: 'AI 未找到有效移动'
+      };
+    }
+
+    return this.opponentTurn(aiMove.pos1, aiMove.pos2);
+  }
+
+  /**
+   * 查找 AI 移动（简化版本，快速查找第一个有效移动）
+   */
+  private findAIMove(): AIMove | null {
+    const gridSize = this.opponent.grid.getSize();
+    const possibleMoves: AIMove[] = [];
+
+    // 根据难度决定搜索范围
+    const searchLimit = this.aiDifficulty === 'easy' ? 10 : 
+                       this.aiDifficulty === 'medium' ? 30 : 50;
+    let searchCount = 0;
+
+    // 遍历网格查找可能的移动
+    for (let row = 0; row < gridSize.rows && searchCount < searchLimit; row++) {
+      for (let col = 0; col < gridSize.cols && searchCount < searchLimit; col++) {
+        const pos1: Position = { row, col };
+
+        // 检查右边
+        if (col < gridSize.cols - 1) {
+          const pos2: Position = { row, col: col + 1 };
+          possibleMoves.push({ pos1, pos2, expectedScore: 10 });
+          searchCount++;
+        }
+
+        // 检查下边
+        if (row < gridSize.rows - 1 && searchCount < searchLimit) {
+          const pos2: Position = { row: row + 1, col };
+          possibleMoves.push({ pos1, pos2, expectedScore: 10 });
+          searchCount++;
+        }
+      }
+    }
+
+    if (possibleMoves.length === 0) return null;
+
+    // 根据难度选择移动
+    return this.selectMoveByDifficulty(possibleMoves);
+  }
+
+  /**
+   * 根据难度选择移动
+   */
+  private selectMoveByDifficulty(moves: AIMove[]): AIMove {
+    switch (this.aiDifficulty) {
+      case 'easy':
+        // 简单：完全随机
+        return moves[Math.floor(Math.random() * moves.length)];
+
+      case 'medium':
+        // 中等：倾向选择前面的移动（可能更优）
+        const mediumIndex = Math.floor(Math.random() * Math.min(moves.length, moves.length / 2));
+        return moves[mediumIndex];
+
+      case 'hard':
+        // 困难：总是选择第一个找到的移动（遍历顺序优先）
+        return moves[0];
+
+      default:
+        return moves[0];
+    }
+  }
+
+  /**
+   * 启用/禁用 AI
+   */
+  public setAIEnabled(enabled: boolean): void {
+    this.enableAI = enabled;
+  }
+
+  /**
+   * 设置 AI 难度
+   */
+  public setAIDifficulty(difficulty: 'easy' | 'medium' | 'hard'): void {
+    this.aiDifficulty = difficulty;
+  }
+
+  /**
+   * 检查 AI 是否启用
+   */
+  public isAIEnabled(): boolean {
+    return this.enableAI;
+  }
+
+  /**
+   * 获取 AI 难度
+   */
+  public getAIDifficulty(): 'easy' | 'medium' | 'hard' {
+    return this.aiDifficulty;
   }
 
   // ==================== 查询方法 ====================
