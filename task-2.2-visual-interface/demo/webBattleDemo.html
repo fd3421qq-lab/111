@@ -1,0 +1,472 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>消消乐AI对战 - Web演示</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        .container {
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 20px;
+            padding: 30px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            max-width: 1200px;
+            width: 100%;
+        }
+
+        h1 {
+            text-align: center;
+            color: #333;
+            margin-bottom: 20px;
+            font-size: 32px;
+            font-weight: 700;
+        }
+
+        .controls {
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+        }
+
+        button {
+            padding: 12px 24px;
+            font-size: 16px;
+            font-weight: 600;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            color: white;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+        }
+
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 16px rgba(0, 0, 0, 0.2);
+        }
+
+        button:active {
+            transform: translateY(0);
+        }
+
+        .btn-start {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        }
+
+        .btn-restart {
+            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+        }
+
+        .btn-pause {
+            background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+        }
+
+        .btn-strategy {
+            background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%);
+        }
+
+        button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .canvas-container {
+            display: flex;
+            justify-content: center;
+            margin: 20px 0;
+            background: #1a1a2e;
+            border-radius: 12px;
+            padding: 20px;
+            box-shadow: inset 0 2px 10px rgba(0, 0, 0, 0.5);
+        }
+
+        canvas {
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+            cursor: pointer;
+        }
+
+        .info-panel {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-top: 20px;
+        }
+
+        .info-card {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            padding: 15px;
+            border-radius: 10px;
+            color: white;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+        }
+
+        .info-card h3 {
+            font-size: 14px;
+            font-weight: 600;
+            margin-bottom: 8px;
+            opacity: 0.9;
+        }
+
+        .info-card p {
+            font-size: 24px;
+            font-weight: 700;
+        }
+
+        .log-container {
+            margin-top: 20px;
+            background: #f8f9fa;
+            border-radius: 10px;
+            padding: 15px;
+            max-height: 200px;
+            overflow-y: auto;
+        }
+
+        .log-container h3 {
+            font-size: 16px;
+            font-weight: 600;
+            margin-bottom: 10px;
+            color: #333;
+        }
+
+        .log-entry {
+            padding: 6px 10px;
+            margin: 4px 0;
+            border-radius: 5px;
+            font-size: 13px;
+            background: white;
+            border-left: 3px solid #667eea;
+        }
+
+        .log-entry.ai {
+            border-left-color: #f5576c;
+        }
+
+        .log-entry.event {
+            border-left-color: #43e97b;
+        }
+
+        .strategy-selector {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+            justify-content: center;
+            margin-top: 10px;
+        }
+
+        .strategy-selector label {
+            font-weight: 600;
+            color: #333;
+        }
+
+        .strategy-selector select {
+            padding: 8px 16px;
+            font-size: 14px;
+            border: 2px solid #667eea;
+            border-radius: 6px;
+            background: white;
+            cursor: pointer;
+            font-weight: 600;
+            color: #667eea;
+        }
+
+        .loading {
+            display: none;
+            text-align: center;
+            color: #667eea;
+            font-weight: 600;
+            margin-top: 10px;
+        }
+
+        .loading.active {
+            display: block;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .spinner {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid rgba(102, 126, 234, 0.3);
+            border-top-color: #667eea;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+            margin-right: 10px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🍬 消消乐AI对战演示</h1>
+
+        <div class="controls">
+            <button id="btnStart" class="btn-start">开始对战</button>
+            <button id="btnRestart" class="btn-restart" disabled>重新开始</button>
+            <button id="btnPause" class="btn-pause" disabled>暂停</button>
+        </div>
+
+        <div class="strategy-selector">
+            <label for="strategySelect">AI策略：</label>
+            <select id="strategySelect">
+                <option value="BALANCED">平衡策略</option>
+                <option value="AGGRESSIVE">激进策略</option>
+                <option value="CONSERVATIVE">保守策略</option>
+            </select>
+        </div>
+
+        <div class="loading" id="loading">
+            <span class="spinner"></span>
+            <span>正在编译TypeScript...</span>
+        </div>
+
+        <div class="canvas-container">
+            <canvas id="gameCanvas" width="800" height="600"></canvas>
+        </div>
+
+        <div class="info-panel">
+            <div class="info-card">
+                <h3>玩家分数</h3>
+                <p id="playerScore">0</p>
+            </div>
+            <div class="info-card">
+                <h3>AI分数</h3>
+                <p id="aiScore">0</p>
+            </div>
+            <div class="info-card">
+                <h3>当前回合</h3>
+                <p id="currentTurn">-</p>
+            </div>
+            <div class="info-card">
+                <h3>事件进度</h3>
+                <p id="eventProgress">0%</p>
+            </div>
+        </div>
+
+        <div class="log-container">
+            <h3>对战日志</h3>
+            <div id="logContent"></div>
+        </div>
+    </div>
+
+    <!-- TypeScript compiled modules will be loaded here -->
+    <script type="module">
+        // Import modules (will be compiled from TypeScript)
+        import { BattleManager } from '../dist/BattleManager.js';
+        import { GameUI } from '../dist/GameUI.js';
+        import { AIStrategy } from '../dist/AIOpponent.js';
+        import { PlayerType } from '../dist/types.js';
+
+        let battleManager = null;
+        let gameUI = null;
+        let isPaused = false;
+        let gameInterval = null;
+
+        // UI Elements
+        const btnStart = document.getElementById('btnStart');
+        const btnRestart = document.getElementById('btnRestart');
+        const btnPause = document.getElementById('btnPause');
+        const strategySelect = document.getElementById('strategySelect');
+        const loadingElement = document.getElementById('loading');
+
+        const playerScoreEl = document.getElementById('playerScore');
+        const aiScoreEl = document.getElementById('aiScore');
+        const currentTurnEl = document.getElementById('currentTurn');
+        const eventProgressEl = document.getElementById('eventProgress');
+        const logContentEl = document.getElementById('logContent');
+
+        // Initialize game
+        function initGame() {
+            const strategy = strategySelect.value;
+            
+            battleManager = new BattleManager({
+                enableAI: true,
+                aiStrategy: AIStrategy[strategy],
+                turnTimeLimit: 0 // No time limit for demo
+            });
+
+            gameUI = new GameUI({
+                canvasId: 'gameCanvas',
+                width: 800,
+                height: 600,
+                cellSize: 40
+            });
+
+            // Bind game UI to battle manager
+            gameUI.bindBattleManager(battleManager);
+
+            // Setup event listeners
+            setupEventListeners();
+
+            // Update UI
+            btnStart.disabled = true;
+            btnRestart.disabled = false;
+            btnPause.disabled = false;
+
+            addLog('游戏初始化完成', 'system');
+            addLog(`AI策略: ${getStrategyName(strategy)}`, 'system');
+        }
+
+        // Setup event listeners
+        function setupEventListeners() {
+            // Canvas click for player moves (handled by GameUI)
+            // No need to add click listener here, GameUI handles it
+        }
+
+        // Start game loop
+        function startGameLoop() {
+            gameInterval = setInterval(() => {
+                if (!isPaused && battleManager) {
+                    // Update battle state
+                    updateGameState();
+
+                    // If it's AI's turn, execute AI move
+                    if (battleManager.getCurrentTurn() === PlayerType.OPPONENT) {
+                        setTimeout(() => {
+                            const aiMove = battleManager.executeAITurn();
+                            if (aiMove) {
+                                addLog(
+                                    `AI执行: (${aiMove.pos1.row},${aiMove.pos1.col}) ↔ (${aiMove.pos2.row},${aiMove.pos2.col}) - ${aiMove.reason}`,
+                                    'ai'
+                                );
+                                gameUI.highlightAIMove(aiMove);
+                            }
+                        }, 500);
+                    }
+
+                    // Check if game is over
+                    if (battleManager.isGameOver()) {
+                        endGame();
+                    }
+                }
+            }, 1000);
+        }
+
+        // Update game state display
+        function updateGameState() {
+            if (!battleManager) return;
+
+            const playerData = battleManager.getPlayerData();
+            const opponentData = battleManager.getOpponentData();
+            const currentTurn = battleManager.getCurrentTurn();
+            const eventBar = battleManager.getGameManager().getEventBar();
+
+            playerScoreEl.textContent = playerData.score.toString();
+            aiScoreEl.textContent = opponentData.score.toString();
+            currentTurnEl.textContent = currentTurn === PlayerType.PLAYER ? '玩家' : 'AI';
+            eventProgressEl.textContent = `${eventBar.progress}%`;
+
+            // Update UI
+            gameUI.updateStateFromBattle(battleManager);
+
+            // Check for active events
+            const activeEvents = eventBar.getActiveEvents();
+            if (activeEvents.length > 0) {
+                for (const event of activeEvents) {
+                    addLog(`事件触发: ${event}`, 'event');
+                    gameUI.showEventEffect(event);
+                }
+            }
+        }
+
+        // End game
+        function endGame() {
+            clearInterval(gameInterval);
+            gameInterval = null;
+
+            const winner = battleManager.getWinner();
+            const winnerName = winner === PlayerType.PLAYER ? '玩家' : 'AI';
+            
+            addLog(`游戏结束! 获胜者: ${winnerName}`, 'system');
+            alert(`游戏结束!\n获胜者: ${winnerName}`);
+
+            btnPause.disabled = true;
+        }
+
+        // Add log entry
+        function addLog(message, type = 'system') {
+            const entry = document.createElement('div');
+            entry.className = `log-entry ${type}`;
+            entry.textContent = `[${new Date().toLocaleTimeString()}] ${message}`;
+            logContentEl.insertBefore(entry, logContentEl.firstChild);
+
+            // Limit log entries
+            if (logContentEl.children.length > 50) {
+                logContentEl.removeChild(logContentEl.lastChild);
+            }
+        }
+
+        // Get strategy display name
+        function getStrategyName(strategy) {
+            const names = {
+                'BALANCED': '平衡策略',
+                'AGGRESSIVE': '激进策略',
+                'CONSERVATIVE': '保守策略'
+            };
+            return names[strategy] || strategy;
+        }
+
+        // Button event handlers
+        btnStart.addEventListener('click', () => {
+            initGame();
+            startGameLoop();
+            addLog('对战开始!', 'system');
+        });
+
+        btnRestart.addEventListener('click', () => {
+            if (gameInterval) {
+                clearInterval(gameInterval);
+            }
+            isPaused = false;
+            btnPause.textContent = '暂停';
+            logContentEl.innerHTML = '';
+            initGame();
+            startGameLoop();
+            addLog('游戏重新开始', 'system');
+        });
+
+        btnPause.addEventListener('click', () => {
+            isPaused = !isPaused;
+            btnPause.textContent = isPaused ? '继续' : '暂停';
+            addLog(isPaused ? '游戏暂停' : '游戏继续', 'system');
+        });
+
+        strategySelect.addEventListener('change', () => {
+            if (battleManager) {
+                addLog(`AI策略已更改为: ${getStrategyName(strategySelect.value)}`, 'system');
+            }
+        });
+
+        // Show loading initially
+        loadingElement.classList.add('active');
+
+        // Hide loading when modules are loaded
+        window.addEventListener('load', () => {
+            loadingElement.classList.remove('active');
+            addLog('系统准备就绪，点击"开始对战"按钮开始游戏', 'system');
+        });
+    </script>
+</body>
+</html>
