@@ -1,24 +1,29 @@
 /**
- * NetworkBattleManager.ts
- * Integrates network system with BattleManager for complete PVP experience
+ * NetworkBattleManager.ts - Task 2.5
+ * Complete network integration by extending BattleManager
+ * Includes state synchronization, conflict resolution, and advanced features
  */
 
-import { BattleManager, PlayerType, TurnResult } from './BattleManager';
+import { BattleManager, BattleConfig, PlayerType, TurnResult, PlayerData } from './BattleManager';
 import { NetworkManager, NetworkMessageType, NetworkMessage, MoveData, StateSyncData } from './NetworkManager';
 import { MatchmakingSystem, MatchmakingMode } from './MatchmakingSystem';
 import { ReconnectionManager, GameStateSnapshot } from './ReconnectionManager';
+import { StateSynchronizer, StateSnapshot, SyncMode } from './StateSynchronizer';
+import { ConflictResolver, ResolutionStrategy, Conflict } from './ConflictResolver';
 import { Position, CandyType } from './GridSystem';
 import { GameEventType } from './GameEventType';
 
 /**
  * Network battle configuration
  */
-export interface NetworkBattleConfig {
+export interface NetworkBattleConfig extends BattleConfig {
   serverUrl: string;
   enableAutoSync?: boolean;
   syncInterval?: number;
   enableReconnection?: boolean;
   enableMatchmaking?: boolean;
+  syncMode?: SyncMode;
+  conflictStrategy?: ResolutionStrategy;
 }
 
 /**
@@ -39,30 +44,85 @@ export enum NetworkBattleState {
  * Player role in network battle
  */
 export enum NetworkPlayerRole {
-  HOST = 'HOST',         // Room creator
-  GUEST = 'GUEST',       // Room joiner
+  HOST = 'HOST',
+  GUEST = 'GUEST',
+  SPECTATOR = 'SPECTATOR',
   UNKNOWN = 'UNKNOWN'
 }
 
 /**
- * NetworkBattleManager class
- * Manages complete PVP battle experience with network synchronization
+ * Network statistics
  */
-export class NetworkBattleManager {
-  private battleManager: BattleManager;
+export interface NetworkStats {
+  latency: number;
+  packetsSent: number;
+  packetsReceived: number;
+  syncCount: number;
+  conflictCount: number;
+  reconnections: number;
+  uptime: number;
+}
+
+/**
+ * Spectator data
+ */
+export interface SpectatorData {
+  id: string;
+  name: string;
+  joinedAt: number;
+}
+
+/**
+ * Replay frame
+ */
+export interface ReplayFrame {
+  timestamp: number;
+  playerId: string;
+  move: MoveData;
+  state: StateSnapshot;
+}
+
+/**
+ * NetworkBattleManager class - Task 2.5
+ * Extends BattleManager to add network synchronization capabilities
+ */
+export class NetworkBattleManager extends BattleManager {
   private networkManager: NetworkManager;
   private matchmakingSystem: MatchmakingSystem;
   private reconnectionManager: ReconnectionManager;
+  private stateSynchronizer: StateSynchronizer;
+  private conflictResolver: ConflictResolver;
   
-  private config: NetworkBattleConfig;
-  private state: NetworkBattleState = NetworkBattleState.DISCONNECTED;
+  private networkConfig: NetworkBattleConfig;
+  private networkState: NetworkBattleState = NetworkBattleState.DISCONNECTED;
   private playerRole: NetworkPlayerRole = NetworkPlayerRole.UNKNOWN;
   private opponentId: string | null = null;
   private roomId: string | null = null;
   
-  private syncIntervalId: number | null = null;
+  private syncIntervalId: NodeJS.Timeout | null = null;
   private localMoveCount = 0;
   private remoteMoveCount = 0;
+  
+  // Spectator support
+  private spectators: Map<string, SpectatorData> = new Map();
+  private enableSpectating = false;
+  
+  // Replay support
+  private replayFrames: ReplayFrame[] = [];
+  private enableReplay = false;
+  private maxReplayFrames = 1000;
+  
+  // Statistics
+  private stats: NetworkStats = {
+    latency: 0,
+    packetsSent: 0,
+    packetsReceived: 0,
+    syncCount: 0,
+    conflictCount: 0,
+    reconnections: 0,
+    uptime: 0
+  };
+  private startTime = 0;
   
   // Event handlers
   private onStateChangeCallback: ((state: NetworkBattleState) => void) | null = null;
@@ -70,32 +130,44 @@ export class NetworkBattleManager {
   private onBattleStartCallback: (() => void) | null = null;
   private onBattleEndCallback: ((winner: PlayerType) => void) | null = null;
   private onErrorCallback: ((error: Error) => void) | null = null;
+  private onConflictCallback: ((conflict: Conflict) => void) | null = null;
+  private onSpectatorJoinCallback: ((spectator: SpectatorData) => void) | null = null;
 
   constructor(config: NetworkBattleConfig) {
-    this.config = {
+    // Initialize parent BattleManager (disable AI for network play)
+    super({
+      ...config,
+      enableAI: false
+    });
+    
+    this.networkConfig = {
       enableAutoSync: true,
-      syncInterval: 5000, // 5 seconds
+      syncInterval: 5000,
       enableReconnection: true,
       enableMatchmaking: true,
+      syncMode: SyncMode.HYBRID,
+      conflictStrategy: ResolutionStrategy.SERVER_AUTHORITATIVE,
       ...config
     };
 
     // Initialize network components
-    this.networkManager = new NetworkManager({ 
-      serverUrl: this.config.serverUrl 
+    this.networkManager = new NetworkManager({
+      serverUrl: this.networkConfig.serverUrl
     });
     
     this.matchmakingSystem = new MatchmakingSystem(this.networkManager);
     this.reconnectionManager = new ReconnectionManager(this.networkManager);
-
-    // Initialize battle manager (without AI)
-    this.battleManager = new BattleManager({
-      enableAI: false
-    });
+    this.stateSynchronizer = new StateSynchronizer(this.networkConfig.syncMode);
+    this.conflictResolver = new ConflictResolver(
+      this.networkConfig.conflictStrategy,
+      false // Client side
+    );
 
     this.setupNetworkHandlers();
     this.setupReconnectionHandlers();
   }
+
+  // ==================== Network Connection Methods ====================
 
   /**
    * Connect to server
@@ -105,6 +177,7 @@ export class NetworkBattleManager {
       this.setState(NetworkBattleState.CONNECTING);
       await this.networkManager.connect();
       this.setState(NetworkBattleState.CONNECTED);
+      this.startTime = Date.now();
     } catch (error) {
       this.setState(NetworkBattleState.ERROR);
       const err = error as Error;
@@ -158,6 +231,23 @@ export class NetworkBattleManager {
   }
 
   /**
+   * Join room as spectator
+   */
+  public async joinAsSpectator(roomId: string): Promise<void> {
+    try {
+      this.ensureConnected();
+      await this.networkManager.joinRoom(roomId);
+      this.roomId = roomId;
+      this.playerRole = NetworkPlayerRole.SPECTATOR;
+      this.setState(NetworkBattleState.IN_ROOM);
+    } catch (error) {
+      const err = error as Error;
+      this.handleError(new Error(`Failed to join as spectator: ${err.message}`));
+      throw error;
+    }
+  }
+
+  /**
    * Leave current room
    */
   public leaveRoom(): void {
@@ -167,12 +257,13 @@ export class NetworkBattleManager {
       this.roomId = null;
       this.opponentId = null;
       this.playerRole = NetworkPlayerRole.UNKNOWN;
+      this.spectators.clear();
       this.setState(NetworkBattleState.CONNECTED);
     }
   }
 
   /**
-   * Find random opponent
+   * Find match using matchmaking
    */
   public async findMatch(mode: MatchmakingMode = MatchmakingMode.RANDOM): Promise<void> {
     try {
@@ -180,7 +271,7 @@ export class NetworkBattleManager {
       const result = await this.matchmakingSystem.findMatch(mode);
       this.roomId = result.roomId;
       this.opponentId = result.opponentId;
-      this.playerRole = NetworkPlayerRole.GUEST; // Matched players are guests
+      this.playerRole = NetworkPlayerRole.GUEST;
       this.setState(NetworkBattleState.IN_ROOM);
     } catch (error) {
       const err = error as Error;
@@ -189,19 +280,20 @@ export class NetworkBattleManager {
     }
   }
 
-  /**
-   * Start battle (called when both players ready)
-   */
-  public startBattle(): void {
-    if (this.state !== NetworkBattleState.IN_ROOM) {
-      throw new Error('Cannot start battle: not in room');
-    }
+  // ==================== Battle Execution Methods ====================
 
+  /**
+   * Override: Start battle with network synchronization
+   */
+  public override startBattle(): void {
+    super.startBattle();
+    
     this.setState(NetworkBattleState.IN_BATTLE);
     this.localMoveCount = 0;
     this.remoteMoveCount = 0;
+    this.replayFrames = [];
 
-    if (this.config.enableAutoSync) {
+    if (this.networkConfig.enableAutoSync) {
       this.startAutoSync();
     }
 
@@ -211,169 +303,310 @@ export class NetworkBattleManager {
   }
 
   /**
-   * Execute player move and sync with opponent
+   * Override: Execute player turn with network sync
    */
-  public async executeMove(pos1: Position, pos2: Position): Promise<TurnResult> {
-    if (this.state !== NetworkBattleState.IN_BATTLE) {
-      throw new Error('Cannot execute move: not in battle');
+  public override playerTurn(pos1: Position, pos2: Position): TurnResult {
+    if (this.playerRole === NetworkPlayerRole.SPECTATOR) {
+      return {
+        success: false,
+        message: 'Spectators cannot make moves'
+      };
     }
-
+    
     // Execute move locally
-    const result = this.battleManager.playerTurn(pos1, pos2);
+    const result = super.playerTurn(pos1, pos2);
 
-    // Send move to opponent
+    // Send move to opponent if successful
     if (result.success) {
       this.localMoveCount++;
-      this.networkManager.sendMove({
+      this.stats.packetsSent++;
+      
+      const move: MoveData = {
         pos1,
         pos2,
         moveNumber: this.localMoveCount
-      });
-
-      // Save snapshot for reconnection
+      };
+      
+      this.networkManager.sendMove(move);
       this.saveGameSnapshot();
+      
+      // Record for replay
+      if (this.enableReplay) {
+        this.recordReplayFrame(move);
+      }
     }
 
     return result;
   }
 
   /**
-   * Get current battle manager
+   * Handle network move from opponent
    */
-  public getBattleManager(): BattleManager {
-    return this.battleManager;
+  public async handleNetworkMove(move: MoveData): Promise<boolean> {
+    try {
+      if (this.networkState !== NetworkBattleState.IN_BATTLE) {
+        return false;
+      }
+
+      this.remoteMoveCount++;
+      this.stats.packetsReceived++;
+
+      // Execute opponent's move
+      const result = super.opponentTurn(move.pos1, move.pos2);
+
+      // Record for replay
+      if (this.enableReplay && result.success) {
+        this.recordReplayFrame(move);
+      }
+
+      // Trigger callback
+      if (this.onOpponentMoveCallback) {
+        this.onOpponentMoveCallback(move);
+      }
+
+      // Save snapshot
+      this.saveGameSnapshot();
+
+      return result.success;
+    } catch (error) {
+      const err = error as Error;
+      this.handleError(new Error(`Failed to handle network move: ${err.message}`));
+      return false;
+    }
   }
 
   /**
-   * Get network manager
+   * Sync game state with opponent
    */
-  public getNetworkManager(): NetworkManager {
-    return this.networkManager;
+  public syncGameState(state: StateSyncData): void {
+    try {
+      const playerData = this.getPlayerData();
+      const opponentData = this.getOpponentData();
+      const eventBar = this.getGameManager().getEventBar();
+
+      // Create snapshot
+      const snapshot = this.stateSynchronizer.createSnapshot(
+        playerData.grid.getGrid(),
+        opponentData.grid.getGrid(),
+        playerData.score,
+        opponentData.score,
+        playerData.moves,
+        opponentData.moves,
+        eventBar.getCurrentProgress(),
+        [], // Active events
+        this.getCurrentTurn().toString()
+      );
+
+      // Prepare sync data
+      const syncData = this.stateSynchronizer.prepareSyncData();
+      if (syncData) {
+        this.networkManager.sendStateSync(state);
+        this.stats.syncCount++;
+      }
+    } catch (error) {
+      const err = error as Error;
+      console.error('[NetworkBattleManager] State sync error:', err.message);
+    }
   }
 
   /**
-   * Get current state
+   * Handle reconnection
    */
-  public getState(): NetworkBattleState {
-    return this.state;
+  public async handleReconnection(): Promise<void> {
+    try {
+      this.setState(NetworkBattleState.RECONNECTING);
+      this.stats.reconnections++;
+
+      // Attempt to recover state
+      const snapshot = await this.reconnectionManager.recoverGameState();
+      
+      if (snapshot) {
+        this.restoreGameState(snapshot);
+        this.setState(NetworkBattleState.IN_BATTLE);
+      } else {
+        // Could not recover, go to lobby
+        this.setState(NetworkBattleState.IN_LOBBY);
+      }
+    } catch (error) {
+      const err = error as Error;
+      this.handleError(new Error(`Reconnection failed: ${err.message}`));
+      this.setState(NetworkBattleState.ERROR);
+    }
+  }
+
+  // ==================== Spectator & Replay Methods ====================
+
+  /**
+   * Enable spectating mode
+   */
+  public enableSpectatorMode(enable: boolean): void {
+    this.enableSpectating = enable;
   }
 
   /**
-   * Get player role
+   * Get spectators list
    */
+  public getSpectators(): SpectatorData[] {
+    return Array.from(this.spectators.values());
+  }
+
+  /**
+   * Enable replay recording
+   */
+  public enableReplayRecording(enable: boolean): void {
+    this.enableReplay = enable;
+  }
+
+  /**
+   * Get replay frames
+   */
+  public getReplayFrames(): ReplayFrame[] {
+    return [...this.replayFrames];
+  }
+
+  /**
+   * Clear replay frames
+   */
+  public clearReplay(): void {
+    this.replayFrames = [];
+  }
+
+  /**
+   * Export replay data
+   */
+  public exportReplay(): string {
+    return JSON.stringify({
+      version: '1.0',
+      roomId: this.roomId,
+      players: {
+        player: this.getPlayerData().id,
+        opponent: this.opponentId
+      },
+      frames: this.replayFrames,
+      startTime: this.startTime,
+      endTime: Date.now()
+    }, null, 2);
+  }
+
+  // ==================== Statistics Methods ====================
+
+  /**
+   * Get network statistics
+   */
+  public getNetworkStats(): NetworkStats {
+    this.stats.latency = this.networkManager.getLatency();
+    this.stats.uptime = this.startTime > 0 ? Date.now() - this.startTime : 0;
+    return { ...this.stats };
+  }
+
+  /**
+   * Get synchronization statistics
+   */
+  public getSyncStats() {
+    return this.stateSynchronizer.getStats();
+  }
+
+  /**
+   * Get conflict statistics
+   */
+  public getConflictStats() {
+    return this.conflictResolver.getStats();
+  }
+
+  // ==================== Getters ====================
+
+  public getNetworkState(): NetworkBattleState {
+    return this.networkState;
+  }
+
   public getPlayerRole(): NetworkPlayerRole {
     return this.playerRole;
   }
 
-  /**
-   * Get opponent ID
-   */
   public getOpponentId(): string | null {
     return this.opponentId;
   }
 
-  /**
-   * Get room ID
-   */
   public getRoomId(): string | null {
     return this.roomId;
   }
 
-  /**
-   * Get network latency
-   */
   public getLatency(): number {
     return this.networkManager.getLatency();
   }
 
-  /**
-   * Check if connected
-   */
   public isConnected(): boolean {
     return this.networkManager.isConnected();
   }
 
-  /**
-   * Check if in battle
-   */
   public isInBattle(): boolean {
-    return this.state === NetworkBattleState.IN_BATTLE;
+    return this.networkState === NetworkBattleState.IN_BATTLE;
   }
 
-  // Event handlers setup
+  public getNetworkManager(): NetworkManager {
+    return this.networkManager;
+  }
 
-  /**
-   * Register state change callback
-   */
+  // ==================== Event Handlers ====================
+
   public onStateChange(callback: (state: NetworkBattleState) => void): void {
     this.onStateChangeCallback = callback;
   }
 
-  /**
-   * Register opponent move callback
-   */
   public onOpponentMove(callback: (move: MoveData) => void): void {
     this.onOpponentMoveCallback = callback;
   }
 
-  /**
-   * Register battle start callback
-   */
   public onBattleStart(callback: () => void): void {
     this.onBattleStartCallback = callback;
   }
 
-  /**
-   * Register battle end callback
-   */
   public onBattleEnd(callback: (winner: PlayerType) => void): void {
     this.onBattleEndCallback = callback;
   }
 
-  /**
-   * Register error callback
-   */
   public onError(callback: (error: Error) => void): void {
     this.onErrorCallback = callback;
   }
 
-  // Private methods
+  public onConflict(callback: (conflict: Conflict) => void): void {
+    this.onConflictCallback = callback;
+  }
+
+  public onSpectatorJoin(callback: (spectator: SpectatorData) => void): void {
+    this.onSpectatorJoinCallback = callback;
+  }
+
+  // ==================== Private Methods ====================
 
   /**
    * Setup network message handlers
    */
   private setupNetworkHandlers(): void {
-    // Handle opponent moves
     this.networkManager.on(NetworkMessageType.MOVE, (msg: NetworkMessage) => {
       this.handleOpponentMove(msg);
     });
 
-    // Handle state sync
     this.networkManager.on(NetworkMessageType.STATE_SYNC, (msg: NetworkMessage) => {
       this.handleStateSync(msg);
     });
 
-    // Handle game start
     this.networkManager.on(NetworkMessageType.GAME_START, (msg: NetworkMessage) => {
       this.opponentId = msg.data.opponentId;
       this.startBattle();
     });
 
-    // Handle game end
     this.networkManager.on(NetworkMessageType.GAME_END, (msg: NetworkMessage) => {
       this.handleGameEnd(msg);
     });
 
-    // Handle room joined
     this.networkManager.on(NetworkMessageType.ROOM_JOINED, (msg: NetworkMessage) => {
       if (msg.data.opponentId) {
         this.opponentId = msg.data.opponentId;
-        // Auto-start battle when opponent joins
         setTimeout(() => this.startBattle(), 1000);
       }
     });
 
-    // Handle player disconnect
     this.networkManager.on(NetworkMessageType.DISCONNECT, (msg: NetworkMessage) => {
       if (msg.playerId === this.opponentId) {
         this.handleError(new Error('Opponent disconnected'));
@@ -385,7 +618,7 @@ export class NetworkBattleManager {
    * Setup reconnection handlers
    */
   private setupReconnectionHandlers(): void {
-    if (!this.config.enableReconnection) return;
+    if (!this.networkConfig.enableReconnection) return;
 
     this.reconnectionManager.onReconnect((snapshot) => {
       if (snapshot) {
@@ -395,38 +628,59 @@ export class NetworkBattleManager {
   }
 
   /**
-   * Handle opponent move
+   * Handle opponent move message
    */
   private handleOpponentMove(msg: NetworkMessage): void {
-    if (this.state !== NetworkBattleState.IN_BATTLE) return;
+    if (this.networkState !== NetworkBattleState.IN_BATTLE) return;
 
     const move = msg.data.move as MoveData;
-    this.remoteMoveCount++;
-
-    // Execute opponent's move in battle manager
-    // Note: In real implementation, need to switch to opponent's turn
-    // For now, we'll just trigger the callback
-    if (this.onOpponentMoveCallback) {
-      this.onOpponentMoveCallback(move);
-    }
-
-    // Save snapshot
-    this.saveGameSnapshot();
+    this.handleNetworkMove(move);
   }
 
   /**
-   * Handle state sync
+   * Handle state sync message
    */
   private handleStateSync(msg: NetworkMessage): void {
-    const state = msg.data.state as StateSyncData;
+    const remoteState = msg.data.state as StateSnapshot;
+    const localSnapshot = this.stateSynchronizer.getCurrentSnapshot();
+
+    if (!localSnapshot) {
+      console.log('[NetworkBattleManager] No local snapshot, accepting remote state');
+      return;
+    }
+
+    // Detect conflicts
+    const conflict = this.conflictResolver.detectConflict(localSnapshot, remoteState);
     
-    // Update local state based on sync data
-    // This would require BattleManager to have state restoration methods
-    console.log('[NetworkBattleManager] State sync received:', state);
+    if (conflict) {
+      this.stats.conflictCount++;
+      
+      if (this.onConflictCallback) {
+        this.onConflictCallback(conflict);
+      }
+
+      // Resolve conflict
+      const resolution = this.conflictResolver.resolveConflict(
+        conflict,
+        localSnapshot,
+        remoteState
+      );
+
+      if (resolution.success) {
+        console.log('[NetworkBattleManager] Conflict resolved:', resolution.message);
+        
+        if (resolution.rollbackRequired) {
+          // Apply resolved state
+          this.applyResolvedState(resolution.resolvedState);
+        }
+      } else {
+        console.error('[NetworkBattleManager] Failed to resolve conflict:', resolution.message);
+      }
+    }
   }
 
   /**
-   * Handle game end
+   * Handle game end message
    */
   private handleGameEnd(msg: NetworkMessage): void {
     this.stopAutoSync();
@@ -444,11 +698,27 @@ export class NetworkBattleManager {
   private startAutoSync(): void {
     if (this.syncIntervalId) return;
 
-    this.syncIntervalId = window.setInterval(() => {
+    this.syncIntervalId = setInterval(() => {
       if (this.isInBattle()) {
-        this.syncGameState();
+        const playerData = this.getPlayerData();
+        const opponentData = this.getOpponentData();
+        const eventBar = this.getGameManager().getEventBar();
+
+        const state: StateSyncData = {
+          playerGrid: playerData.grid.getGrid(),
+          opponentGrid: opponentData.grid.getGrid(),
+          playerScore: playerData.score,
+          opponentScore: opponentData.score,
+          playerMoves: playerData.moves,
+          opponentMoves: opponentData.moves,
+          eventProgress: eventBar.getCurrentProgress(),
+          activeEvents: [],
+          currentTurn: this.getCurrentTurn().toString()
+        };
+
+        this.syncGameState(state);
       }
-    }, this.config.syncInterval!);
+    }, this.networkConfig.syncInterval!);
   }
 
   /**
@@ -462,37 +732,14 @@ export class NetworkBattleManager {
   }
 
   /**
-   * Sync game state to opponent
-   */
-  private syncGameState(): void {
-    const playerData = this.battleManager.getPlayerData();
-    const opponentData = this.battleManager.getOpponentData();
-    const eventBar = this.battleManager.getGameManager().getEventBar();
-
-    const state: StateSyncData = {
-      playerGrid: playerData.grid.getGrid(),
-      opponentGrid: opponentData.grid.getGrid(),
-      playerScore: playerData.score,
-      opponentScore: opponentData.score,
-      playerMoves: playerData.moves,
-      opponentMoves: opponentData.moves,
-      eventProgress: eventBar.getCurrentProgress(),
-      activeEvents: [], // TODO: Track active events in GameManager
-      currentTurn: this.battleManager.getCurrentTurn().toString()
-    };
-
-    this.networkManager.sendStateSync(state);
-  }
-
-  /**
-   * Save game snapshot for reconnection
+   * Save game snapshot
    */
   private saveGameSnapshot(): void {
-    if (!this.config.enableReconnection || !this.roomId) return;
+    if (!this.networkConfig.enableReconnection || !this.roomId) return;
 
-    const playerData = this.battleManager.getPlayerData();
-    const opponentData = this.battleManager.getOpponentData();
-    const eventBar = this.battleManager.getGameManager().getEventBar();
+    const playerData = this.getPlayerData();
+    const opponentData = this.getOpponentData();
+    const eventBar = this.getGameManager().getEventBar();
 
     const snapshot: GameStateSnapshot = {
       timestamp: Date.now(),
@@ -507,10 +754,10 @@ export class NetworkBattleManager {
         playerMoves: playerData.moves,
         opponentMoves: opponentData.moves,
         eventProgress: eventBar.getCurrentProgress(),
-        activeEvents: [], // TODO: Track active events in GameManager
-        currentTurn: this.battleManager.getCurrentTurn().toString()
+        activeEvents: [],
+        currentTurn: this.getCurrentTurn().toString()
       },
-      moveHistory: [], // TODO: Track move history
+      moveHistory: [],
       lastSyncedMove: this.localMoveCount
     };
 
@@ -527,17 +774,83 @@ export class NetworkBattleManager {
     this.opponentId = snapshot.opponentId;
     this.localMoveCount = snapshot.lastSyncedMove;
 
-    // Restore state in battle manager
-    // This would require BattleManager to have restoration methods
+    // TODO: Implement state restoration in BattleManager
+    // This would require adding restoration methods to parent class
     
     this.setState(NetworkBattleState.IN_BATTLE);
   }
 
   /**
-   * Set state and notify callback
+   * Apply resolved state after conflict
+   */
+  private applyResolvedState(state: StateSnapshot): void {
+    console.log('[NetworkBattleManager] Applying resolved state');
+    
+    // TODO: Implement state application
+    // This would update all game state based on resolved snapshot
+  }
+
+  /**
+   * Record replay frame
+   */
+  private recordReplayFrame(move: MoveData): void {
+    if (!this.enableReplay) return;
+
+    const playerData = this.getPlayerData();
+    const opponentData = this.getOpponentData();
+    const eventBar = this.getGameManager().getEventBar();
+
+    const frame: ReplayFrame = {
+      timestamp: Date.now(),
+      playerId: this.networkManager.getPlayerId(),
+      move,
+      state: {
+        timestamp: Date.now(),
+        version: this.localMoveCount + this.remoteMoveCount,
+        playerGrid: playerData.grid.getGrid(),
+        opponentGrid: opponentData.grid.getGrid(),
+        playerScore: playerData.score,
+        opponentScore: opponentData.score,
+        playerMoves: playerData.moves,
+        opponentMoves: opponentData.moves,
+        eventProgress: eventBar.getCurrentProgress(),
+        activeEvents: [],
+        currentTurn: this.getCurrentTurn().toString()
+      }
+    };
+
+    this.replayFrames.push(frame);
+
+    // Limit replay size
+    if (this.replayFrames.length > this.maxReplayFrames) {
+      this.replayFrames.shift();
+    }
+  }
+
+  /**
+   * Handle spectator join
+   */
+  private handleSpectatorJoin(spectatorId: string, name: string): void {
+    if (!this.enableSpectating) return;
+
+    const spectator: SpectatorData = {
+      id: spectatorId,
+      name,
+      joinedAt: Date.now()
+    };
+
+    this.spectators.set(spectatorId, spectator);
+
+    if (this.onSpectatorJoinCallback) {
+      this.onSpectatorJoinCallback(spectator);
+    }
+  }
+
+  /**
+   * Set network state
    */
   private setState(state: NetworkBattleState): void {
-    this.state = state;
+    this.networkState = state;
     if (this.onStateChangeCallback) {
       this.onStateChangeCallback(state);
     }

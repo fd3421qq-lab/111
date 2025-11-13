@@ -3,676 +3,739 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>消消乐网络对战 - PVP Demo</title>
+    <title>任务2.5 - 完整网络对战集成演示</title>
+    <script src="https://cdn.tailwindcss.com"></script>
     <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-
         body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             min-height: 100vh;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            padding: 20px;
         }
-
-        .container {
+        
+        .stats-card {
             background: rgba(255, 255, 255, 0.95);
-            border-radius: 20px;
-            padding: 30px;
-            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
-            max-width: 1200px;
-            width: 100%;
-        }
-
-        h1 {
-            text-align: center;
-            color: #333;
-            margin-bottom: 20px;
-            font-size: 32px;
-            font-weight: 700;
-        }
-
-        .connection-panel {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            padding: 20px;
+            backdrop-filter: blur(10px);
             border-radius: 12px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+            padding: 20px;
             margin-bottom: 20px;
-            color: white;
         }
-
-        .connection-status {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            margin-bottom: 15px;
-        }
-
+        
         .status-indicator {
-            display: flex;
-            align-items: center;
-            gap: 10px;
-        }
-
-        .status-dot {
             width: 12px;
             height: 12px;
             border-radius: 50%;
-            background: #ff4757;
+            display: inline-block;
+            margin-right: 8px;
         }
-
-        .status-dot.connected {
-            background: #26de81;
-            box-shadow: 0 0 10px rgba(38, 222, 129, 0.5);
-        }
-
-        .latency {
-            font-size: 14px;
-            opacity: 0.9;
-        }
-
-        .controls {
-            display: flex;
-            justify-content: center;
-            gap: 10px;
-            margin-bottom: 20px;
-            flex-wrap: wrap;
-        }
-
-        button {
-            padding: 12px 24px;
-            font-size: 16px;
-            font-weight: 600;
-            border: none;
-            border-radius: 8px;
-            cursor: pointer;
-            transition: all 0.3s ease;
-            color: white;
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-        }
-
-        button:hover:not(:disabled) {
-            transform: translateY(-2px);
-            box-shadow: 0 6px 16px rgba(0, 0, 0, 0.2);
-        }
-
-        button:active:not(:disabled) {
-            transform: translateY(0);
-        }
-
-        button:disabled {
-            opacity: 0.5;
-            cursor: not-allowed;
-            transform: none;
-        }
-
-        .btn-connect {
-            background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%);
-        }
-
-        .btn-create {
+        
+        .status-connected { background-color: #10b981; }
+        .status-disconnected { background-color: #ef4444; }
+        .status-in-battle { background-color: #3b82f6; }
+        .status-reconnecting { background-color: #f59e0b; }
+        
+        .metric-box {
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-        }
-
-        .btn-join {
-            background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
-        }
-
-        .btn-matchmaking {
-            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
-        }
-
-        .btn-leave {
-            background: linear-gradient(135deg, #ff6b6b 0%, #ee5a6f 100%);
-        }
-
-        .room-panel {
-            display: none;
-            background: #f8f9fa;
-            padding: 15px;
-            border-radius: 10px;
-            margin-bottom: 20px;
-        }
-
-        .room-panel.active {
-            display: block;
-        }
-
-        .room-info {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
-
-        .room-id {
-            font-size: 18px;
-            font-weight: 600;
-            color: #667eea;
-        }
-
-        .copy-btn {
-            padding: 6px 12px;
-            font-size: 14px;
-            background: #667eea;
             color: white;
-            border: none;
-            border-radius: 6px;
-            cursor: pointer;
-        }
-
-        .canvas-container {
-            display: flex;
-            justify-content: center;
-            margin: 20px 0;
-            background: #1a1a2e;
-            border-radius: 12px;
-            padding: 20px;
-            box-shadow: inset 0 2px 10px rgba(0, 0, 0, 0.5);
-        }
-
-        canvas {
+            padding: 15px;
             border-radius: 8px;
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+            text-align: center;
+            margin: 5px;
         }
-
-        .info-panel {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-            gap: 15px;
-            margin-top: 20px;
-        }
-
-        .info-card {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            padding: 15px;
-            border-radius: 10px;
-            color: white;
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-        }
-
-        .info-card h3 {
-            font-size: 14px;
-            font-weight: 600;
-            margin-bottom: 8px;
-            opacity: 0.9;
-        }
-
-        .info-card p {
+        
+        .metric-value {
             font-size: 24px;
-            font-weight: 700;
+            font-weight: bold;
         }
-
-        .log-container {
-            margin-top: 20px;
-            background: #f8f9fa;
-            border-radius: 10px;
-            padding: 15px;
+        
+        .metric-label {
+            font-size: 12px;
+            opacity: 0.9;
+        }
+        
+        .conflict-log {
             max-height: 200px;
             overflow-y: auto;
-        }
-
-        .log-container h3 {
-            font-size: 16px;
-            font-weight: 600;
-            margin-bottom: 10px;
-            color: #333;
-        }
-
-        .log-entry {
-            padding: 6px 10px;
-            margin: 4px 0;
-            border-radius: 5px;
-            font-size: 13px;
-            background: white;
-            border-left: 3px solid #667eea;
-        }
-
-        .log-entry.network {
-            border-left-color: #43e97b;
-        }
-
-        .log-entry.error {
-            border-left-color: #ff4757;
-        }
-
-        .log-entry.opponent {
-            border-left-color: #f5576c;
-        }
-
-        .join-room-dialog {
-            display: none;
-            position: fixed;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            background: white;
-            padding: 30px;
-            border-radius: 15px;
-            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
-            z-index: 1000;
-        }
-
-        .join-room-dialog.active {
-            display: block;
-        }
-
-        .overlay {
-            display: none;
-            position: fixed;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            background: rgba(0, 0, 0, 0.5);
-            z-index: 999;
-        }
-
-        .overlay.active {
-            display: block;
-        }
-
-        .dialog-content h2 {
-            margin-bottom: 20px;
-            color: #333;
-        }
-
-        .dialog-content input {
-            width: 100%;
-            padding: 12px;
-            border: 2px solid #667eea;
+            background: #f9fafb;
             border-radius: 8px;
-            font-size: 16px;
-            margin-bottom: 15px;
+            padding: 10px;
+            font-family: monospace;
+            font-size: 12px;
         }
-
-        .dialog-actions {
+        
+        .spectator-list {
+            max-height: 150px;
+            overflow-y: auto;
+        }
+        
+        .spectator-item {
+            background: #f3f4f6;
+            padding: 8px;
+            border-radius: 6px;
+            margin-bottom: 5px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+        
+        .replay-controls {
             display: flex;
             gap: 10px;
-            justify-content: flex-end;
-        }
-
-        .matchmaking-status {
-            display: none;
-            text-align: center;
-            padding: 20px;
-            background: #f8f9fa;
-            border-radius: 10px;
-            margin: 20px 0;
-        }
-
-        .matchmaking-status.active {
-            display: block;
-        }
-
-        .spinner {
-            display: inline-block;
-            width: 40px;
-            height: 40px;
-            border: 4px solid rgba(102, 126, 234, 0.3);
-            border-top-color: #667eea;
-            border-radius: 50%;
-            animation: spin 0.8s linear infinite;
-            margin-bottom: 15px;
-        }
-
-        @keyframes spin {
-            to { transform: rotate(360deg); }
+            margin-top: 10px;
         }
     </style>
 </head>
-<body>
-    <div class="overlay" id="overlay"></div>
-    
-    <div class="container">
-        <h1>🌐 消消乐网络对战</h1>
+<body class="p-6">
+    <div class="max-w-7xl mx-auto">
+        <h1 class="text-4xl font-bold text-white text-center mb-8">
+            🎮 任务2.5 - 完整网络对战集成演示
+        </h1>
 
-        <!-- Connection Panel -->
-        <div class="connection-panel">
-            <div class="connection-status">
-                <div class="status-indicator">
-                    <div class="status-dot" id="statusDot"></div>
-                    <span id="statusText">未连接</span>
+        <!-- Main Grid -->
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <!-- Left Column: Connection & Stats -->
+            <div class="space-y-6">
+                <!-- Connection Control -->
+                <div class="stats-card">
+                    <h2 class="text-xl font-bold mb-4">🔌 连接控制</h2>
+                    <div class="space-y-3">
+                        <div class="flex items-center">
+                            <span id="statusIndicator" class="status-indicator status-disconnected"></span>
+                            <span id="statusText" class="font-medium">未连接</span>
+                        </div>
+                        
+                        <button id="connectBtn" class="w-full bg-green-500 text-white py-2 px-4 rounded hover:bg-green-600 transition">
+                            连接服务器
+                        </button>
+                        
+                        <button id="disconnectBtn" class="w-full bg-red-500 text-white py-2 px-4 rounded hover:bg-red-600 transition" disabled>
+                            断开连接
+                        </button>
+                        
+                        <hr class="my-3">
+                        
+                        <button id="createRoomBtn" class="w-full bg-blue-500 text-white py-2 px-4 rounded hover:bg-blue-600 transition" disabled>
+                            创建房间
+                        </button>
+                        
+                        <div class="flex gap-2">
+                            <input id="roomIdInput" type="text" placeholder="房间ID" 
+                                   class="flex-1 px-3 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500">
+                            <button id="joinRoomBtn" class="bg-purple-500 text-white px-4 py-2 rounded hover:bg-purple-600 transition" disabled>
+                                加入
+                            </button>
+                        </div>
+                        
+                        <button id="findMatchBtn" class="w-full bg-indigo-500 text-white py-2 px-4 rounded hover:bg-indigo-600 transition" disabled>
+                            快速匹配
+                        </button>
+                        
+                        <button id="spectateBtn" class="w-full bg-gray-500 text-white py-2 px-4 rounded hover:bg-gray-600 transition" disabled>
+                            观战模式
+                        </button>
+                    </div>
+                    
+                    <div id="roomInfo" class="mt-4 p-3 bg-blue-50 rounded hidden">
+                        <div class="text-sm">
+                            <div><strong>房间ID:</strong> <span id="currentRoomId">-</span></div>
+                            <div><strong>角色:</strong> <span id="playerRole">-</span></div>
+                            <div><strong>对手ID:</strong> <span id="opponentId">-</span></div>
+                        </div>
+                    </div>
                 </div>
-                <div class="latency">
-                    延迟: <span id="latencyValue">--</span>ms
+
+                <!-- Network Statistics -->
+                <div class="stats-card">
+                    <h2 class="text-xl font-bold mb-4">📊 网络统计</h2>
+                    <div class="grid grid-cols-2 gap-2">
+                        <div class="metric-box">
+                            <div class="metric-value" id="latencyValue">-</div>
+                            <div class="metric-label">延迟 (ms)</div>
+                        </div>
+                        <div class="metric-box">
+                            <div class="metric-value" id="syncCountValue">-</div>
+                            <div class="metric-label">同步次数</div>
+                        </div>
+                        <div class="metric-box">
+                            <div class="metric-value" id="conflictCountValue">-</div>
+                            <div class="metric-label">冲突次数</div>
+                        </div>
+                        <div class="metric-box">
+                            <div class="metric-value" id="reconnectValue">-</div>
+                            <div class="metric-label">重连次数</div>
+                        </div>
+                    </div>
+                    
+                    <div class="mt-4 text-sm text-gray-600">
+                        <div>发送: <span id="packetsSent">0</span> 包</div>
+                        <div>接收: <span id="packetsReceived">0</span> 包</div>
+                        <div>运行时间: <span id="uptime">0</span>s</div>
+                    </div>
+                </div>
+
+                <!-- Sync Statistics -->
+                <div class="stats-card">
+                    <h2 class="text-xl font-bold mb-4">🔄 同步统计</h2>
+                    <div class="text-sm space-y-2">
+                        <div class="flex justify-between">
+                            <span>总同步:</span>
+                            <strong id="totalSyncs">0</strong>
+                        </div>
+                        <div class="flex justify-between">
+                            <span>完整同步:</span>
+                            <strong id="fullSyncs">0</strong>
+                        </div>
+                        <div class="flex justify-between">
+                            <span>增量同步:</span>
+                            <strong id="deltaSyncs">0</strong>
+                        </div>
+                        <div class="flex justify-between">
+                            <span>平均增量大小:</span>
+                            <strong id="avgDeltaSize">0</strong>
+                        </div>
+                        <div class="flex justify-between">
+                            <span>平均延迟:</span>
+                            <strong id="avgLatency">0</strong> ms
+                        </div>
+                    </div>
                 </div>
             </div>
-            <div class="controls">
-                <button id="btnConnect" class="btn-connect">连接服务器</button>
-                <button id="btnCreate" class="btn-create" disabled>创建房间</button>
-                <button id="btnJoin" class="btn-join" disabled>加入房间</button>
-                <button id="btnMatchmaking" class="btn-matchmaking" disabled>随机匹配</button>
-                <button id="btnLeave" class="btn-leave" disabled>离开房间</button>
-            </div>
-        </div>
 
-        <!-- Room Panel -->
-        <div class="room-panel" id="roomPanel">
-            <div class="room-info">
-                <div>
-                    <strong>房间ID:</strong> <span class="room-id" id="roomId">--</span>
+            <!-- Middle Column: Game Display -->
+            <div class="stats-card">
+                <h2 class="text-xl font-bold mb-4">🎯 对战区域</h2>
+                
+                <div id="battleArea" class="text-center py-20 text-gray-400 hidden">
+                    <p class="text-lg">等待开始对战...</p>
+                    <p class="text-sm mt-2">创建或加入房间后开始游戏</p>
                 </div>
-                <button class="copy-btn" id="btnCopy">复制</button>
+                
+                <div id="gameDisplay" class="hidden">
+                    <!-- Player Scores -->
+                    <div class="grid grid-cols-2 gap-4 mb-4">
+                        <div class="bg-blue-100 p-4 rounded">
+                            <div class="text-sm text-gray-600">玩家</div>
+                            <div class="text-2xl font-bold" id="playerScore">0</div>
+                            <div class="text-xs text-gray-500">移动: <span id="playerMoves">0</span></div>
+                        </div>
+                        <div class="bg-red-100 p-4 rounded">
+                            <div class="text-sm text-gray-600">对手</div>
+                            <div class="text-2xl font-bold" id="opponentScore">0</div>
+                            <div class="text-xs text-gray-500">移动: <span id="opponentMoves">0</span></div>
+                        </div>
+                    </div>
+                    
+                    <!-- Grid Placeholder -->
+                    <div class="bg-gray-100 rounded p-4 text-center">
+                        <p class="text-gray-500 text-sm">游戏画面占位区域</p>
+                        <p class="text-gray-400 text-xs mt-2">实际游戏中应显示Canvas画面</p>
+                    </div>
+                    
+                    <!-- Move History -->
+                    <div class="mt-4">
+                        <h3 class="font-bold mb-2">📝 移动记录</h3>
+                        <div id="moveHistory" class="conflict-log text-xs">
+                            <div class="text-gray-400">暂无移动记录</div>
+                        </div>
+                    </div>
+                </div>
             </div>
-            <div style="margin-top: 10px;">
-                <strong>对手:</strong> <span id="opponentId">等待中...</span>
-            </div>
-        </div>
 
-        <!-- Matchmaking Status -->
-        <div class="matchmaking-status" id="matchmakingStatus">
-            <div class="spinner"></div>
-            <p>正在寻找对手... (<span id="searchDuration">0</span>秒)</p>
-        </div>
+            <!-- Right Column: Advanced Features -->
+            <div class="space-y-6">
+                <!-- Conflict Resolution -->
+                <div class="stats-card">
+                    <h2 class="text-xl font-bold mb-4">⚠️ 冲突解决</h2>
+                    
+                    <div class="mb-3">
+                        <label class="block text-sm font-medium mb-2">解决策略:</label>
+                        <select id="conflictStrategy" class="w-full px-3 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500">
+                            <option value="SERVER_AUTHORITATIVE">服务器权威</option>
+                            <option value="CLIENT_AUTHORITATIVE">客户端权威</option>
+                            <option value="LATEST_TIMESTAMP">最新时间戳</option>
+                            <option value="MERGE">尝试合并</option>
+                            <option value="ROLLBACK">回滚</option>
+                        </select>
+                    </div>
+                    
+                    <div class="text-sm space-y-2">
+                        <div class="flex justify-between">
+                            <span>版本冲突:</span>
+                            <strong id="versionConflicts">0</strong>
+                        </div>
+                        <div class="flex justify-between">
+                            <span>状态分歧:</span>
+                            <strong id="stateDivergence">0</strong>
+                        </div>
+                        <div class="flex justify-between">
+                            <span>网格不一致:</span>
+                            <strong id="gridInconsistency">0</strong>
+                        </div>
+                    </div>
+                    
+                    <div class="mt-4">
+                        <h3 class="font-bold text-sm mb-2">冲突日志:</h3>
+                        <div id="conflictLog" class="conflict-log">
+                            <div class="text-gray-400 text-xs">暂无冲突记录</div>
+                        </div>
+                    </div>
+                </div>
 
-        <!-- Canvas -->
-        <div class="canvas-container">
-            <canvas id="gameCanvas" width="800" height="600"></canvas>
-        </div>
+                <!-- Spectators -->
+                <div class="stats-card">
+                    <h2 class="text-xl font-bold mb-4">👥 观众列表</h2>
+                    
+                    <div class="mb-3">
+                        <label class="flex items-center">
+                            <input type="checkbox" id="enableSpectating" class="mr-2">
+                            <span class="text-sm">启用观战模式</span>
+                        </label>
+                    </div>
+                    
+                    <div id="spectatorList" class="spectator-list">
+                        <div class="text-gray-400 text-sm text-center py-4">暂无观众</div>
+                    </div>
+                </div>
 
-        <!-- Info Panel -->
-        <div class="info-panel">
-            <div class="info-card">
-                <h3>你的分数</h3>
-                <p id="playerScore">0</p>
-            </div>
-            <div class="info-card">
-                <h3>对手分数</h3>
-                <p id="opponentScore">0</p>
-            </div>
-            <div class="info-card">
-                <h3>当前回合</h3>
-                <p id="currentTurn">-</p>
-            </div>
-            <div class="info-card">
-                <h3>网络状态</h3>
-                <p id="networkQuality">--</p>
-            </div>
-        </div>
+                <!-- Replay -->
+                <div class="stats-card">
+                    <h2 class="text-xl font-bold mb-4">🎬 回放系统</h2>
+                    
+                    <div class="mb-3">
+                        <label class="flex items-center">
+                            <input type="checkbox" id="enableReplay" class="mr-2" checked>
+                            <span class="text-sm">启用回放录制</span>
+                        </label>
+                    </div>
+                    
+                    <div class="text-sm space-y-2 mb-3">
+                        <div class="flex justify-between">
+                            <span>已录制帧数:</span>
+                            <strong id="replayFrameCount">0</strong>
+                        </div>
+                    </div>
+                    
+                    <div class="replay-controls">
+                        <button id="exportReplayBtn" class="flex-1 bg-green-500 text-white py-2 px-3 rounded text-sm hover:bg-green-600 transition" disabled>
+                            导出回放
+                        </button>
+                        <button id="clearReplayBtn" class="flex-1 bg-red-500 text-white py-2 px-3 rounded text-sm hover:bg-red-600 transition" disabled>
+                            清空回放
+                        </button>
+                    </div>
+                </div>
 
-        <!-- Log Container -->
-        <div class="log-container">
-            <h3>对战日志</h3>
-            <div id="logContent"></div>
-        </div>
-    </div>
-
-    <!-- Join Room Dialog -->
-    <div class="join-room-dialog" id="joinDialog">
-        <div class="dialog-content">
-            <h2>加入房间</h2>
-            <input type="text" id="roomIdInput" placeholder="输入房间ID">
-            <div class="dialog-actions">
-                <button class="btn-join" id="btnConfirmJoin">加入</button>
-                <button class="btn-leave" id="btnCancelJoin">取消</button>
+                <!-- Event Log -->
+                <div class="stats-card">
+                    <h2 class="text-xl font-bold mb-4">📋 事件日志</h2>
+                    <div id="eventLog" class="conflict-log">
+                        <div class="text-gray-400 text-xs">暂无事件</div>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
 
     <script type="module">
-        // Import modules (will be compiled from TypeScript)
-        import { NetworkManager, NetworkMessageType } from '../dist/NetworkManager.js';
-        import { MatchmakingSystem, MatchmakingMode } from '../dist/MatchmakingSystem.js';
-        import { ReconnectionManager } from '../dist/ReconnectionManager.js';
-        import { BattleManager } from '../dist/BattleManager.js';
-        import { GameUI } from '../dist/GameUI.js';
-        import { PlayerType } from '../dist/BattleManager.js';
+        import { NetworkBattleManager } from '../dist/NetworkBattleManager.js';
+        import { NetworkBattleState, NetworkPlayerRole } from '../dist/NetworkBattleManager.js';
+        import { MatchmakingMode } from '../dist/MatchmakingSystem.js';
+        import { ResolutionStrategy } from '../dist/ConflictResolver.js';
 
-        // WebSocket server URL
-        // For local development: ws://localhost:8080
-        // For sandbox: wss://8080-iktgs51wmt9svcuxtee4x-b32ec7bb.sandbox.novita.ai
+        // Auto-detect WebSocket URL
         const WS_URL = window.location.hostname === 'localhost' 
             ? 'ws://localhost:8080' 
             : 'wss://8080-iktgs51wmt9svcuxtee4x-b32ec7bb.sandbox.novita.ai';
 
-        let networkManager = null;
-        let matchmakingSystem = null;
-        let reconnectionManager = null;
-        let battleManager = null;
-        let gameUI = null;
-        let currentRoomId = null;
+        let networkBattle = null;
+        let statsInterval = null;
 
-        // UI Elements
-        const statusDot = document.getElementById('statusDot');
-        const statusText = document.getElementById('statusText');
-        const latencyValue = document.getElementById('latencyValue');
-        const btnConnect = document.getElementById('btnConnect');
-        const btnCreate = document.getElementById('btnCreate');
-        const btnJoin = document.getElementById('btnJoin');
-        const btnMatchmaking = document.getElementById('btnMatchmaking');
-        const btnLeave = document.getElementById('btnLeave');
-        const roomPanel = document.getElementById('roomPanel');
-        const roomIdEl = document.getElementById('roomId');
-        const opponentIdEl = document.getElementById('opponentId');
-        const matchmakingStatus = document.getElementById('matchmakingStatus');
-        const searchDuration = document.getElementById('searchDuration');
-        const logContentEl = document.getElementById('logContent');
-        const joinDialog = document.getElementById('joinDialog');
-        const overlay = document.getElementById('overlay');
+        // DOM Elements
+        const elements = {
+            // Connection
+            connectBtn: document.getElementById('connectBtn'),
+            disconnectBtn: document.getElementById('disconnectBtn'),
+            createRoomBtn: document.getElementById('createRoomBtn'),
+            joinRoomBtn: document.getElementById('joinRoomBtn'),
+            findMatchBtn: document.getElementById('findMatchBtn'),
+            spectateBtn: document.getElementById('spectateBtn'),
+            roomIdInput: document.getElementById('roomIdInput'),
+            
+            // Status
+            statusIndicator: document.getElementById('statusIndicator'),
+            statusText: document.getElementById('statusText'),
+            roomInfo: document.getElementById('roomInfo'),
+            currentRoomId: document.getElementById('currentRoomId'),
+            playerRole: document.getElementById('playerRole'),
+            opponentId: document.getElementById('opponentId'),
+            
+            // Statistics
+            latencyValue: document.getElementById('latencyValue'),
+            syncCountValue: document.getElementById('syncCountValue'),
+            conflictCountValue: document.getElementById('conflictCountValue'),
+            reconnectValue: document.getElementById('reconnectValue'),
+            packetsSent: document.getElementById('packetsSent'),
+            packetsReceived: document.getElementById('packetsReceived'),
+            uptime: document.getElementById('uptime'),
+            
+            // Sync Stats
+            totalSyncs: document.getElementById('totalSyncs'),
+            fullSyncs: document.getElementById('fullSyncs'),
+            deltaSyncs: document.getElementById('deltaSyncs'),
+            avgDeltaSize: document.getElementById('avgDeltaSize'),
+            avgLatency: document.getElementById('avgLatency'),
+            
+            // Game
+            battleArea: document.getElementById('battleArea'),
+            gameDisplay: document.getElementById('gameDisplay'),
+            playerScore: document.getElementById('playerScore'),
+            opponentScore: document.getElementById('opponentScore'),
+            playerMoves: document.getElementById('playerMoves'),
+            opponentMoves: document.getElementById('opponentMoves'),
+            moveHistory: document.getElementById('moveHistory'),
+            
+            // Conflicts
+            conflictStrategy: document.getElementById('conflictStrategy'),
+            versionConflicts: document.getElementById('versionConflicts'),
+            stateDivergence: document.getElementById('stateDivergence'),
+            gridInconsistency: document.getElementById('gridInconsistency'),
+            conflictLog: document.getElementById('conflictLog'),
+            
+            // Spectators
+            enableSpectating: document.getElementById('enableSpectating'),
+            spectatorList: document.getElementById('spectatorList'),
+            
+            // Replay
+            enableReplay: document.getElementById('enableReplay'),
+            replayFrameCount: document.getElementById('replayFrameCount'),
+            exportReplayBtn: document.getElementById('exportReplayBtn'),
+            clearReplayBtn: document.getElementById('clearReplayBtn'),
+            
+            // Event Log
+            eventLog: document.getElementById('eventLog')
+        };
 
-        // Connect to server
-        btnConnect.addEventListener('click', async () => {
+        // Event Handlers
+        elements.connectBtn.addEventListener('click', connectToServer);
+        elements.disconnectBtn.addEventListener('click', disconnect);
+        elements.createRoomBtn.addEventListener('click', createRoom);
+        elements.joinRoomBtn.addEventListener('click', joinRoom);
+        elements.findMatchBtn.addEventListener('click', findMatch);
+        elements.spectateBtn.addEventListener('click', joinAsSpectator);
+        elements.enableSpectating.addEventListener('change', toggleSpectating);
+        elements.enableReplay.addEventListener('change', toggleReplay);
+        elements.exportReplayBtn.addEventListener('click', exportReplay);
+        elements.clearReplayBtn.addEventListener('click', clearReplay);
+
+        // Connection Functions
+        async function connectToServer() {
             try {
-                btnConnect.disabled = true;
-                btnConnect.textContent = '连接中...';
+                logEvent('正在连接到服务器...');
                 
-                networkManager = new NetworkManager({ serverUrl: WS_URL });
-                matchmakingSystem = new MatchmakingSystem(networkManager);
-                reconnectionManager = new ReconnectionManager(networkManager);
+                networkBattle = new NetworkBattleManager({
+                    serverUrl: WS_URL,
+                    enableAutoSync: true,
+                    syncInterval: 5000,
+                    enableReconnection: true,
+                    enableMatchmaking: true
+                });
 
-                await networkManager.connect();
+                setupNetworkCallbacks();
+                await networkBattle.connect();
                 
-                updateConnectionStatus(true);
-                btnCreate.disabled = false;
-                btnJoin.disabled = false;
-                btnMatchmaking.disabled = false;
-                
-                addLog('已连接到服务器', 'network');
-                setupNetworkHandlers();
-                startLatencyMonitor();
+                logEvent('✅ 成功连接到服务器');
+                startStatsUpdater();
             } catch (error) {
-                addLog(`连接失败: ${error.message}`, 'error');
-                btnConnect.disabled = false;
-                btnConnect.textContent = '连接服务器';
+                logEvent(`❌ 连接失败: ${error.message}`, 'error');
             }
-        });
+        }
 
-        // Create room
-        btnCreate.addEventListener('click', async () => {
+        function disconnect() {
+            if (networkBattle) {
+                networkBattle.disconnect();
+                stopStatsUpdater();
+                networkBattle = null;
+                logEvent('已断开连接');
+            }
+        }
+
+        async function createRoom() {
             try {
-                btnCreate.disabled = true;
-                const roomId = await matchmakingSystem.createCustomRoom();
-                currentRoomId = roomId;
-                roomIdEl.textContent = roomId;
-                roomPanel.classList.add('active');
-                btnLeave.disabled = false;
-                addLog(`房间已创建: ${roomId}`, 'network');
+                const roomId = await networkBattle.createRoom();
+                logEvent(`✅ 房间已创建: ${roomId}`);
             } catch (error) {
-                addLog(`创建房间失败: ${error.message}`, 'error');
-                btnCreate.disabled = false;
+                logEvent(`❌ 创建房间失败: ${error.message}`, 'error');
             }
-        });
+        }
 
-        // Join room
-        btnJoin.addEventListener('click', () => {
-            joinDialog.classList.add('active');
-            overlay.classList.add('active');
-        });
-
-        document.getElementById('btnConfirmJoin').addEventListener('click', async () => {
-            const roomId = document.getElementById('roomIdInput').value.trim();
-            if (!roomId) {
-                addLog('请输入房间ID', 'error');
-                return;
-            }
-
+        async function joinRoom() {
             try {
-                await matchmakingSystem.joinCustomRoom(roomId);
-                currentRoomId = roomId;
-                roomIdEl.textContent = roomId;
-                roomPanel.classList.add('active');
-                btnLeave.disabled = false;
-                joinDialog.classList.remove('active');
-                overlay.classList.remove('active');
-                addLog(`已加入房间: ${roomId}`, 'network');
-            } catch (error) {
-                addLog(`加入房间失败: ${error.message}`, 'error');
-            }
-        });
-
-        document.getElementById('btnCancelJoin').addEventListener('click', () => {
-            joinDialog.classList.remove('active');
-            overlay.classList.remove('active');
-        });
-
-        // Random matchmaking
-        btnMatchmaking.addEventListener('click', async () => {
-            try {
-                btnMatchmaking.disabled = true;
-                matchmakingStatus.classList.add('active');
-                
-                let duration = 0;
-                const durationInterval = setInterval(() => {
-                    duration++;
-                    searchDuration.textContent = duration;
-                }, 1000);
-
-                const result = await matchmakingSystem.findMatch(MatchmakingMode.RANDOM);
-                
-                clearInterval(durationInterval);
-                matchmakingStatus.classList.remove('active');
-                
-                currentRoomId = result.roomId;
-                roomIdEl.textContent = result.roomId;
-                opponentIdEl.textContent = result.opponentId;
-                roomPanel.classList.add('active');
-                btnLeave.disabled = false;
-                
-                addLog(`匹配成功! 对手: ${result.opponentId}`, 'network');
-                startGame();
-            } catch (error) {
-                matchmakingStatus.classList.remove('active');
-                addLog(`匹配失败: ${error.message}`, 'error');
-                btnMatchmaking.disabled = false;
-            }
-        });
-
-        // Leave room
-        btnLeave.addEventListener('click', () => {
-            if (currentRoomId) {
-                networkManager.leaveRoom();
-                roomPanel.classList.remove('active');
-                currentRoomId = null;
-                btnLeave.disabled = true;
-                btnCreate.disabled = false;
-                btnMatchmaking.disabled = false;
-                addLog('已离开房间', 'network');
-            }
-        });
-
-        // Copy room ID
-        document.getElementById('btnCopy').addEventListener('click', () => {
-            navigator.clipboard.writeText(currentRoomId);
-            addLog('房间ID已复制到剪贴板', 'network');
-        });
-
-        // Setup network handlers
-        function setupNetworkHandlers() {
-            networkManager.on(NetworkMessageType.MOVE, (msg) => {
-                addLog(`对手移动: (${msg.data.move.pos1.row},${msg.data.move.pos1.col}) ↔ (${msg.data.move.pos2.row},${msg.data.move.pos2.col})`, 'opponent');
-                // Handle opponent move in game
-            });
-
-            networkManager.on(NetworkMessageType.ROOM_JOINED, (msg) => {
-                if (msg.data.opponentId) {
-                    opponentIdEl.textContent = msg.data.opponentId;
-                    addLog(`对手已加入: ${msg.data.opponentId}`, 'network');
-                    startGame();
+                const roomId = elements.roomIdInput.value.trim();
+                if (!roomId) {
+                    alert('请输入房间ID');
+                    return;
                 }
-            });
-
-            networkManager.on(NetworkMessageType.GAME_START, (msg) => {
-                addLog('游戏开始!', 'network');
-            });
-
-            networkManager.on(NetworkMessageType.PLAYER_LEFT, (msg) => {
-                addLog('对手已离开', 'opponent');
-            });
-
-            networkManager.on(NetworkMessageType.PLAYER_DISCONNECTED, (msg) => {
-                addLog('对手断开连接', 'error');
-            });
-        }
-
-        // Start game
-        function startGame() {
-            battleManager = new BattleManager({
-                enableAI: false,
-                turnTimeLimit: 0
-            });
-
-            gameUI = new GameUI({
-                canvasId: 'gameCanvas',
-                width: 800,
-                height: 600,
-                cellSize: 40
-            });
-
-            gameUI.bindBattleManager(battleManager);
-            addLog('对战已开始!', 'network');
-        }
-
-        // Update connection status
-        function updateConnectionStatus(connected) {
-            if (connected) {
-                statusDot.classList.add('connected');
-                statusText.textContent = '已连接';
-                btnConnect.textContent = '已连接';
-                btnConnect.disabled = true;
-            } else {
-                statusDot.classList.remove('connected');
-                statusText.textContent = '未连接';
-                btnConnect.textContent = '连接服务器';
-                btnConnect.disabled = false;
+                
+                await networkBattle.joinRoom(roomId);
+                logEvent(`✅ 已加入房间: ${roomId}`);
+            } catch (error) {
+                logEvent(`❌ 加入房间失败: ${error.message}`, 'error');
             }
         }
 
-        // Start latency monitor
-        function startLatencyMonitor() {
-            setInterval(() => {
-                if (networkManager && networkManager.isConnected()) {
-                    const latency = networkManager.getLatency();
-                    latencyValue.textContent = latency;
-                    
-                    // Update network quality
-                    let quality = '优秀';
-                    if (latency > 200) quality = '较差';
-                    else if (latency > 100) quality = '一般';
-                    else if (latency > 50) quality = '良好';
-                    document.getElementById('networkQuality').textContent = quality;
+        async function findMatch() {
+            try {
+                logEvent('正在寻找对手...');
+                await networkBattle.findMatch(MatchmakingMode.RANDOM);
+                logEvent('✅ 已找到对手');
+            } catch (error) {
+                logEvent(`❌ 匹配失败: ${error.message}`, 'error');
+            }
+        }
+
+        async function joinAsSpectator() {
+            try {
+                const roomId = elements.roomIdInput.value.trim();
+                if (!roomId) {
+                    alert('请输入房间ID');
+                    return;
                 }
-            }, 1000);
-        }
-
-        // Add log entry
-        function addLog(message, type = 'system') {
-            const entry = document.createElement('div');
-            entry.className = `log-entry ${type}`;
-            entry.textContent = `[${new Date().toLocaleTimeString()}] ${message}`;
-            logContentEl.insertBefore(entry, logContentEl.firstChild);
-
-            if (logContentEl.children.length > 50) {
-                logContentEl.removeChild(logContentEl.lastChild);
+                
+                await networkBattle.joinAsSpectator(roomId);
+                logEvent(`✅ 已作为观众加入房间: ${roomId}`);
+            } catch (error) {
+                logEvent(`❌ 观战失败: ${error.message}`, 'error');
             }
         }
 
-        // Initial log
-        addLog('欢迎使用网络对战系统', 'network');
+        // Feature Toggles
+        function toggleSpectating(event) {
+            if (networkBattle) {
+                networkBattle.enableSpectatorMode(event.target.checked);
+                logEvent(`观战模式: ${event.target.checked ? '启用' : '禁用'}`);
+            }
+        }
+
+        function toggleReplay(event) {
+            if (networkBattle) {
+                networkBattle.enableReplayRecording(event.target.checked);
+                logEvent(`回放录制: ${event.target.checked ? '启用' : '禁用'}`);
+            }
+        }
+
+        function exportReplay() {
+            if (networkBattle) {
+                const replayData = networkBattle.exportReplay();
+                const blob = new Blob([replayData], { type: 'application/json' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `replay_${Date.now()}.json`;
+                a.click();
+                URL.revokeObjectURL(url);
+                logEvent('✅ 回放已导出');
+            }
+        }
+
+        function clearReplay() {
+            if (networkBattle) {
+                networkBattle.clearReplay();
+                elements.replayFrameCount.textContent = '0';
+                logEvent('🗑️ 回放已清空');
+            }
+        }
+
+        // Setup Callbacks
+        function setupNetworkCallbacks() {
+            networkBattle.onStateChange(handleStateChange);
+            networkBattle.onOpponentMove(handleOpponentMove);
+            networkBattle.onBattleStart(handleBattleStart);
+            networkBattle.onBattleEnd(handleBattleEnd);
+            networkBattle.onError(handleError);
+            networkBattle.onConflict(handleConflict);
+            networkBattle.onSpectatorJoin(handleSpectatorJoin);
+        }
+
+        function handleStateChange(state) {
+            updateStatusUI(state);
+            updateButtonStates(state);
+            
+            if (state === NetworkBattleState.IN_ROOM) {
+                showRoomInfo();
+            }
+        }
+
+        function handleOpponentMove(move) {
+            logMove(`对手移动: (${move.pos1.row},${move.pos1.col}) → (${move.pos2.row},${move.pos2.col})`);
+        }
+
+        function handleBattleStart() {
+            elements.battleArea.classList.add('hidden');
+            elements.gameDisplay.classList.remove('hidden');
+            logEvent('🎮 对战开始!');
+        }
+
+        function handleBattleEnd(winner) {
+            logEvent(`🏆 对战结束! 胜者: ${winner}`);
+        }
+
+        function handleError(error) {
+            logEvent(`❌ 错误: ${error.message}`, 'error');
+        }
+
+        function handleConflict(conflict) {
+            logConflict(`${conflict.type}: ${conflict.description}`);
+        }
+
+        function handleSpectatorJoin(spectator) {
+            addSpectator(spectator);
+            logEvent(`👥 观众加入: ${spectator.name}`);
+        }
+
+        // UI Update Functions
+        function updateStatusUI(state) {
+            const statusMap = {
+                [NetworkBattleState.DISCONNECTED]: { text: '未连接', class: 'status-disconnected' },
+                [NetworkBattleState.CONNECTING]: { text: '连接中...', class: 'status-reconnecting' },
+                [NetworkBattleState.CONNECTED]: { text: '已连接', class: 'status-connected' },
+                [NetworkBattleState.IN_LOBBY]: { text: '大厅', class: 'status-connected' },
+                [NetworkBattleState.IN_ROOM]: { text: '房间中', class: 'status-in-battle' },
+                [NetworkBattleState.IN_BATTLE]: { text: '对战中', class: 'status-in-battle' },
+                [NetworkBattleState.RECONNECTING]: { text: '重连中...', class: 'status-reconnecting' },
+                [NetworkBattleState.ERROR]: { text: '错误', class: 'status-disconnected' }
+            };
+
+            const status = statusMap[state] || statusMap[NetworkBattleState.DISCONNECTED];
+            elements.statusText.textContent = status.text;
+            elements.statusIndicator.className = `status-indicator ${status.class}`;
+        }
+
+        function updateButtonStates(state) {
+            const connected = state !== NetworkBattleState.DISCONNECTED;
+            const inRoom = state === NetworkBattleState.IN_ROOM || state === NetworkBattleState.IN_BATTLE;
+            
+            elements.connectBtn.disabled = connected;
+            elements.disconnectBtn.disabled = !connected;
+            elements.createRoomBtn.disabled = !connected || inRoom;
+            elements.joinRoomBtn.disabled = !connected || inRoom;
+            elements.findMatchBtn.disabled = !connected || inRoom;
+            elements.spectateBtn.disabled = !connected || inRoom;
+            elements.exportReplayBtn.disabled = !networkBattle || networkBattle.getReplayFrames().length === 0;
+            elements.clearReplayBtn.disabled = !networkBattle || networkBattle.getReplayFrames().length === 0;
+        }
+
+        function showRoomInfo() {
+            if (networkBattle) {
+                elements.roomInfo.classList.remove('hidden');
+                elements.currentRoomId.textContent = networkBattle.getRoomId() || '-';
+                elements.playerRole.textContent = networkBattle.getPlayerRole();
+                elements.opponentId.textContent = networkBattle.getOpponentId() || '等待中...';
+            }
+        }
+
+        function updateStats() {
+            if (!networkBattle) return;
+
+            // Network stats
+            const networkStats = networkBattle.getNetworkStats();
+            elements.latencyValue.textContent = networkStats.latency;
+            elements.syncCountValue.textContent = networkStats.syncCount;
+            elements.conflictCountValue.textContent = networkStats.conflictCount;
+            elements.reconnectValue.textContent = networkStats.reconnections;
+            elements.packetsSent.textContent = networkStats.packetsSent;
+            elements.packetsReceived.textContent = networkStats.packetsReceived;
+            elements.uptime.textContent = Math.floor(networkStats.uptime / 1000);
+
+            // Sync stats
+            const syncStats = networkBattle.getSyncStats();
+            elements.totalSyncs.textContent = syncStats.totalSyncs;
+            elements.fullSyncs.textContent = syncStats.fullSyncs;
+            elements.deltaSyncs.textContent = syncStats.deltaSyncs;
+            elements.avgDeltaSize.textContent = syncStats.averageDeltaSize.toFixed(1);
+            elements.avgLatency.textContent = syncStats.averageLatency.toFixed(0);
+
+            // Conflict stats
+            const conflictStats = networkBattle.getConflictStats();
+            elements.versionConflicts.textContent = conflictStats.byType.VERSION_MISMATCH || 0;
+            elements.stateDivergence.textContent = conflictStats.byType.STATE_DIVERGENCE || 0;
+            elements.gridInconsistency.textContent = conflictStats.byType.GRID_INCONSISTENCY || 0;
+
+            // Game stats
+            if (networkBattle.isInBattle()) {
+                const playerData = networkBattle.getPlayerData();
+                const opponentData = networkBattle.getOpponentData();
+                elements.playerScore.textContent = playerData.score;
+                elements.opponentScore.textContent = opponentData.score;
+                elements.playerMoves.textContent = playerData.moves;
+                elements.opponentMoves.textContent = opponentData.moves;
+            }
+
+            // Replay
+            elements.replayFrameCount.textContent = networkBattle.getReplayFrames().length;
+        }
+
+        function startStatsUpdater() {
+            statsInterval = setInterval(updateStats, 1000);
+        }
+
+        function stopStatsUpdater() {
+            if (statsInterval) {
+                clearInterval(statsInterval);
+                statsInterval = null;
+            }
+        }
+
+        // Logging Functions
+        function logEvent(message, type = 'info') {
+            const time = new Date().toLocaleTimeString();
+            const color = type === 'error' ? 'text-red-600' : 'text-gray-700';
+            const entry = `<div class="${color}">[${time}] ${message}</div>`;
+            
+            if (elements.eventLog.querySelector('.text-gray-400')) {
+                elements.eventLog.innerHTML = '';
+            }
+            
+            elements.eventLog.innerHTML = entry + elements.eventLog.innerHTML;
+        }
+
+        function logMove(message) {
+            const time = new Date().toLocaleTimeString();
+            const entry = `<div class="text-blue-600">[${time}] ${message}</div>`;
+            
+            if (elements.moveHistory.querySelector('.text-gray-400')) {
+                elements.moveHistory.innerHTML = '';
+            }
+            
+            elements.moveHistory.innerHTML = entry + elements.moveHistory.innerHTML;
+        }
+
+        function logConflict(message) {
+            const time = new Date().toLocaleTimeString();
+            const entry = `<div class="text-red-600">[${time}] ${message}</div>`;
+            
+            if (elements.conflictLog.querySelector('.text-gray-400')) {
+                elements.conflictLog.innerHTML = '';
+            }
+            
+            elements.conflictLog.innerHTML = entry + elements.conflictLog.innerHTML;
+        }
+
+        function addSpectator(spectator) {
+            if (elements.spectatorList.querySelector('.text-gray-400')) {
+                elements.spectatorList.innerHTML = '';
+            }
+            
+            const item = document.createElement('div');
+            item.className = 'spectator-item';
+            item.innerHTML = `
+                <span>${spectator.name}</span>
+                <span class="text-xs text-gray-500">${new Date(spectator.joinedAt).toLocaleTimeString()}</span>
+            `;
+            elements.spectatorList.appendChild(item);
+        }
+
+        // Initialize
+        logEvent('🎮 网络对战系统已就绪');
+        logEvent('💡 点击"连接服务器"开始');
     </script>
 </body>
 </html>
