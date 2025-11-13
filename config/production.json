@@ -1,0 +1,86 @@
+{
+  "environment": "production",
+  "version": "1.0.0",
+  
+  "server": {
+    "http": {
+      "port": 3000,
+      "host": "0.0.0.0"
+    },
+    "websocket": {
+      "port": 8080,
+      "host": "0.0.0.0",
+      "pingInterval": 30000,
+      "pingTimeout": 5000
+    }
+  },
+  
+  "game": {
+    "maxMoves": 30,
+    "targetScore": 1000,
+    "eventProgressMax": 100,
+    "gridSize": {
+      "rows": 8,
+      "cols": 8
+    }
+  },
+  
+  "network": {
+    "syncInterval": 5000,
+    "syncMode": "HYBRID",
+    "conflictStrategy": "SERVER_AUTHORITATIVE",
+    "enableAutoSync": true,
+    "enableReconnection": true,
+    "maxReconnectAttempts": 3,
+    "reconnectDelay": 2000
+  },
+  
+  "performance": {
+    "enableMemoryOptimization": true,
+    "enableNetworkBatching": true,
+    "enableRenderingThrottle": true,
+    "targetFPS": 60,
+    "maxCacheSize": 100,
+    "batchInterval": 100
+  },
+  
+  "errorHandling": {
+    "enableReporting": true,
+    "enableConsoleLog": false,
+    "maxReports": 100,
+    "reportingEndpoint": "https://your-error-reporting-service.com/api/errors"
+  },
+  
+  "security": {
+    "enableRateLimiting": true,
+    "maxRequestsPerMinute": 100,
+    "enableInputValidation": true,
+    "enableCSRFProtection": true
+  },
+  
+  "logging": {
+    "level": "error",
+    "enableFileLogging": true,
+    "logDirectory": "./logs",
+    "maxLogSize": "10MB",
+    "maxLogFiles": 5
+  },
+  
+  "deployment": {
+    "platform": "cloudflare-pages",
+    "branch": "main",
+    "buildCommand": "npm run build",
+    "outputDirectory": "dist",
+    "environmentVariables": {
+      "NODE_ENV": "production",
+      "API_URL": "https://your-api-domain.com"
+    }
+  },
+  
+  "monitoring": {
+    "enableMetrics": true,
+    "metricsInterval": 60000,
+    "enableHealthCheck": true,
+    "healthCheckInterval": 30000
+  }
+}
